@@ -1,0 +1,55 @@
+/* Task object blah blah adsd
+sfsf fafasf affaf fasfaf
+*/
+syntax = "proto3";
+package logtask;
+
+service LogTask {
+  rpc AddTask (Task) returns (TaskId) {}
+  rpc ListTasks(TaskListOptions) returns (TaskList) {}
+  rpc UpdateTask(TaskUpdateOptions) returns (ReturnStatus) {}
+  rpc DeleteTask(TaskId) returns (ReturnStatus) {}
+}
+
+// Task object...
+message Task {
+  string name = 1;
+  string id = 2;
+  string desc = 3;
+  string priority = 4;
+  string for = 5;
+  string on = 6;
+  string starting = 7;
+  string remind = 8;
+  string location = 9;
+  repeated string tags = 10;  
+  repeated string comments = 11;  
+}
+
+// Id of the Task...
+message TaskId {
+  string id = 1;
+}
+
+// List of tasks...
+message TaskList {
+  repeated Task tasks = 1;
+}
+
+// Options to pass in a params for listing tasks...
+message TaskListOptions {
+  string status = 1;
+  string for = 2;
+}
+
+// Options to pass in for updating a task...
+message TaskUpdateOptions {
+  TaskId taskId = 1;
+  Task task = 2;
+}
+
+// Return status of delete and update task operations...
+message ReturnStatus {
+  bool success = 1;
+  string message = 2;
+}
