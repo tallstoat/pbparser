@@ -73,7 +73,7 @@ func (s *scanner) parse(pf *ProtoFile, br *bufio.Reader) {
 				fmt.Printf(err.Error())
 				os.Exit(-1)
 			}
-			fmt.Printf("%v", docstring)
+			fmt.Printf("%v \n\n", docstring)
 		} else if isLetter(c) {
 			//s.unread()
 			decl, err := s.readDeclaration()
@@ -101,9 +101,9 @@ func (s *scanner) readDeclaration() (declaration, error) {
 func (s *scanner) readDocumentation() (string, error) {
 	c := s.read()
 	if c == '/' {
-		return s.readCommentType1(), nil
+		return s.readSingleLineComment(), nil
 	} else if c == '*' {
-		return s.readCommentType2(), nil
+		return s.readMultiLineComment(), nil
 	}
 
 	msg := fmt.Sprintf("Expected '/' or '*', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
@@ -111,7 +111,7 @@ func (s *scanner) readDocumentation() (string, error) {
 	return "", err
 }
 
-func (s *scanner) readCommentType2() string {
+func (s *scanner) readMultiLineComment() string {
 	var buf bytes.Buffer
 	for {
 		c := s.read()
@@ -125,12 +125,35 @@ func (s *scanner) readCommentType2() string {
 			buf.WriteRune(c2)
 		}
 	}
+	str := buf.String()
+	return strings.TrimSpace(str)
+}
+
+func (s *scanner) readSingleLineComment() string {
+	str := s.readUntilNewline()
+	return strings.TrimSpace(str)
+}
+
+func (s *scanner) readUntilNewline() string {
+	var buf bytes.Buffer
+	for {
+		c := s.read()
+		if c == '\n' || c == eof {
+			break
+		}
+		buf.WriteRune(c)
+	}
 	return buf.String()
 }
 
-//TODO: implement this properly
-func (s *scanner) readCommentType1() string {
-	return ""
+//NOTE: This is not in use yet!
+func (s *scanner) skipUntilNewline() {
+	for {
+		c := s.read()
+		if c == '\n' || c == eof {
+			return
+		}
+	}
 }
 
 func (s *scanner) unread() {

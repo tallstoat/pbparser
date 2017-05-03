@@ -4,6 +4,7 @@ sfsf fafasf affaf fasfaf
 syntax = "proto3";
 package logtask;
 
+// LogTask is a service which handles operations on tasks defined via a custom DSL
 service LogTask {
   rpc AddTask (Task) returns (TaskId) {}
   rpc ListTasks(TaskListOptions) returns (TaskList) {}
