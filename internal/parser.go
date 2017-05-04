@@ -18,11 +18,13 @@ const (
 	serviceElem
 	optioneElem
 	extendElem
+	unknown
 )
 
 // ProtoFile ...
 type ProtoFile struct {
-	Comment string
+	PackageName string
+	Syntax      string
 }
 
 // ParseFile ...
@@ -63,29 +65,32 @@ func (s *scanner) parse(pf *ProtoFile, br *bufio.Reader) {
 			break
 		}
 
-		// if whitespace, consume all contiguous whitespace till newline
-		// if start of comment, extract the comment
+		// last documentation parsed...
+		var documentation string
+
 		if isWhitespace(c) {
+			// if whitespace, consume all contiguous whitespace till newline
 			s.skipWhitespace()
 		} else if isStartOfComment(c) {
-			docstring, err := s.readDocumentation()
+			// if start of comment, extract the comment
+			var err error
+			documentation, err = s.readDocumentation()
 			if err != nil {
-				fmt.Printf(err.Error())
+				fmt.Printf(err.Error() + "\n")
 				os.Exit(-1)
 			}
-			fmt.Printf("%v \n\n", docstring)
+			fmt.Printf("Documentation: %v \n\n", documentation)
 		} else if isLetter(c) {
-			//s.unread()
-			decl, err := s.readDeclaration()
+			s.unread()
+			decl, err := s.readDeclaration(pf, documentation)
 			if err != nil {
-				fmt.Printf(err.Error())
+				fmt.Printf("Error: " + err.Error() + "\n")
 				os.Exit(-1)
 			}
 
 			if decl == typeElem {
-
+				//TODO: scan for "declaration" and handle each type accordingly
 			}
-			//TODO: scan for "declaration" and handle each type accordingly
 		} else if isDigit(c) {
 			//s.unread()
 			//TODO: This is illegal, right!
@@ -93,9 +98,64 @@ func (s *scanner) parse(pf *ProtoFile, br *bufio.Reader) {
 	}
 }
 
-//TODO: implement this properly
-func (s *scanner) readDeclaration() (declaration, error) {
+//TODO: handle all possible values of "label"
+func (s *scanner) readDeclaration(pf *ProtoFile, documentation string) (declaration, error) {
+	label := s.readWord()
+	if label == "package" {
+		s.skipWhitespace()
+		pf.PackageName = s.readWord()
+	} else if label == "syntax" {
+		s.skipWhitespace()
+		if c := s.read(); c != '=' {
+			msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+			return unknown, errors.New(msg)
+		}
+		s.skipWhitespace()
+		syntax, err := s.readQuotedString()
+		if err != nil {
+			return unknown, err
+		}
+		if syntax != "proto2" && syntax != "proto3" {
+			return unknown, errors.New("'syntax' must be 'proto2' or 'proto3'. Found: " + syntax)
+		}
+		if c := s.read(); c != ';' {
+			msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+			return unknown, errors.New(msg)
+		}
+		pf.Syntax = syntax
+	} else if label == "import" {
+		//TODO: implement this properly
+	}
+
+	//TODO: fix this return...
 	return typeElem, nil
+}
+
+func (s *scanner) readQuotedString() (string, error) {
+	if c := s.read(); c != '"' {
+		msg := fmt.Sprintf("Expected starting '\"', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+		return "", errors.New(msg)
+	}
+	str := s.readWord()
+	if c := s.read(); c != '"' {
+		msg := fmt.Sprintf("Expected ending '\"', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+		return "", errors.New(msg)
+	}
+	return str, nil
+}
+
+func (s *scanner) readWord() string {
+	var buf bytes.Buffer
+	for {
+		c := s.read()
+		if isValidCharInWord(c) {
+			buf.WriteRune(c)
+		} else {
+			s.unread()
+			break
+		}
+	}
+	return buf.String()
 }
 
 func (s *scanner) readDocumentation() (string, error) {
@@ -184,6 +244,10 @@ func (s *scanner) skipWhitespace() {
 			break
 		}
 	}
+}
+
+func isValidCharInWord(c rune) bool {
+	return isLetter(c) || isDigit(c) || c == '_' || c == '-' || c == '.'
 }
 
 func isStartOfComment(c rune) bool {

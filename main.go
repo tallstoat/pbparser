@@ -14,5 +14,6 @@ func main() {
 		os.Exit(-1)
 	}
 
-	fmt.Println(pf.Comment)
+	fmt.Println("Syntax: " + pf.Syntax)
+	fmt.Println("PackageName: " + pf.PackageName)
 }
