@@ -18,13 +18,42 @@ const (
 	serviceElem
 	optioneElem
 	extendElem
-	unknown
+	unknownElem
 )
 
 // ProtoFile ...
 type ProtoFile struct {
 	PackageName string
 	Syntax      string
+	Enums       []EnumElement
+}
+
+// Kind the kind of option
+type Kind int
+
+// Kind the associated types
+const (
+	STRING Kind = iota
+	BOOLEAN
+	NUMBER
+	ENUM
+	MAP
+	LIST
+	OPTION
+)
+
+// OptionElement ...
+type OptionElement struct {
+	Name  string
+	Value int
+	Kind  Kind
+}
+
+// EnumElement ...
+type EnumElement struct {
+	Name          string
+	Documentation string
+	Options       []OptionElement
 }
 
 // ParseFile ...
@@ -105,30 +134,55 @@ func (s *scanner) readDeclaration(pf *ProtoFile, documentation string) (declarat
 		s.skipWhitespace()
 		pf.PackageName = s.readWord()
 	} else if label == "syntax" {
-		s.skipWhitespace()
-		if c := s.read(); c != '=' {
-			msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
-			return unknown, errors.New(msg)
+		if err := s.readSyntax(pf); err != nil {
+			return unknownElem, err
 		}
-		s.skipWhitespace()
-		syntax, err := s.readQuotedString()
-		if err != nil {
-			return unknown, err
-		}
-		if syntax != "proto2" && syntax != "proto3" {
-			return unknown, errors.New("'syntax' must be 'proto2' or 'proto3'. Found: " + syntax)
-		}
-		if c := s.read(); c != ';' {
-			msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
-			return unknown, errors.New(msg)
-		}
-		pf.Syntax = syntax
 	} else if label == "import" {
-		//TODO: implement this properly
+		//TODO: implement this later
+	} else if label == "message" {
+		if err := s.readMessage(pf, documentation); err != nil {
+			return unknownElem, err
+		}
+	} else if label == "enum" {
+		if err := s.readEnum(pf, documentation); err != nil {
+			return unknownElem, err
+		}
 	}
 
 	//TODO: fix this return...
-	return typeElem, nil
+	return unknownElem, nil
+}
+
+func (s *scanner) readMessage(pf *ProtoFile, documentation string) error {
+	//TODO: implement after handling "message" elements...
+	return nil
+}
+
+func (s *scanner) readEnum(pf *ProtoFile, documentation string) error {
+	//TODO: implement this...
+	return nil
+}
+
+func (s *scanner) readSyntax(pf *ProtoFile) error {
+	s.skipWhitespace()
+	if c := s.read(); c != '=' {
+		msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+		return errors.New(msg)
+	}
+	s.skipWhitespace()
+	syntax, err := s.readQuotedString()
+	if err != nil {
+		return err
+	}
+	if syntax != "proto2" && syntax != "proto3" {
+		return errors.New("'syntax' must be 'proto2' or 'proto3'. Found: " + syntax)
+	}
+	if c := s.read(); c != ';' {
+		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+		return errors.New(msg)
+	}
+	pf.Syntax = syntax
+	return nil
 }
 
 func (s *scanner) readQuotedString() (string, error) {
@@ -142,6 +196,29 @@ func (s *scanner) readQuotedString() (string, error) {
 		return "", errors.New(msg)
 	}
 	return str, nil
+}
+
+func (s *scanner) readName() (string, error) {
+	var name string
+	c := s.read()
+	if c == '(' {
+		name = s.readWord()
+		if s.read() != ')' {
+			msg := fmt.Sprintf("Expected ')' on line: %v, column: %v", s.loc.line, s.loc.column)
+			return "", errors.New(msg)
+		}
+		s.unread()
+	} else if c == '[' {
+		name = s.readWord()
+		if s.read() != ']' {
+			msg := fmt.Sprintf("Expected ']' on line: %v, column: %v", s.loc.line, s.loc.column)
+			return "", errors.New(msg)
+		}
+		s.unread()
+	} else {
+		name = s.readWord()
+	}
+	return name, nil
 }
 
 func (s *scanner) readWord() string {
