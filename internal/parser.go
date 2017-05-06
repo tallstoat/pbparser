@@ -76,6 +76,7 @@ func ParseFile(filePath string) (ProtoFile, error) {
 	return pf, nil
 }
 
+/* This method just looks for documentation and then declaration in a loop till EOF is reached */
 func (s *scanner) scan(pf *ProtoFile) {
 	for {
 		// read any documentation if found...
@@ -287,7 +288,11 @@ func (s *scanner) readUntilNewline() string {
 	var buf bytes.Buffer
 	for {
 		c := s.read()
-		if c == '\n' || c == eof {
+		if c == '\n' {
+			break
+		}
+		if c == eof {
+			eofReached = true
 			break
 		}
 		buf.WriteRune(c)
@@ -299,7 +304,11 @@ func (s *scanner) readUntilNewline() string {
 func (s *scanner) skipUntilNewline() {
 	for {
 		c := s.read()
-		if c == '\n' || c == eof {
+		if c == '\n' {
+			return
+		}
+		if c == eof {
+			eofReached = true
 			return
 		}
 	}
@@ -327,6 +336,7 @@ func (s *scanner) skipWhitespace() {
 	for {
 		c := s.read()
 		if c == eof {
+			eofReached = true
 			break
 		} else if !isWhitespace(c) {
 			s.unread()
@@ -362,5 +372,8 @@ func isDigit(c rune) bool {
 	return (c >= '0' && c <= '9')
 }
 
+// End of the file...
 var eof = rune(0)
+
+// We set this flag, when eof is encountered...
 var eofReached bool
