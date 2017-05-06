@@ -71,9 +71,38 @@ func ParseFile(filePath string) (ProtoFile, error) {
 
 	loc := location{}
 	scanner := scanner{br: br, loc: &loc}
-	scanner.parse(&pf, br)
+	scanner.scan(&pf)
 
 	return pf, nil
+}
+
+func (s *scanner) scan(pf *ProtoFile) {
+	for {
+		// read any documentation if found...
+		documentation, err := s.readDocumentationIfFound()
+		finishIfNecessary(err)
+		if eofReached {
+			break
+		}
+
+		// TODO: remove it later; print the documentation just for informational purposes...
+		if documentation != "" {
+			fmt.Printf("Documentation: %v \n\n", documentation)
+		}
+
+		// skip any intervening whitespace if present...
+		s.skipWhitespace()
+		if eofReached {
+			break
+		}
+
+		// read any declaration...
+		err = s.readDeclaration(pf, documentation)
+		finishIfNecessary(err)
+		if eofReached {
+			break
+		}
+	}
 }
 
 type location struct {
@@ -86,71 +115,54 @@ type scanner struct {
 	loc *location
 }
 
-func (s *scanner) parse(pf *ProtoFile, br *bufio.Reader) {
+func (s *scanner) readDocumentationIfFound() (string, error) {
 	for {
-		// read the next rune...
 		c := s.read()
 		if c == eof {
+			eofReached = true
 			break
-		}
-
-		// last documentation parsed...
-		var documentation string
-
-		if isWhitespace(c) {
-			// if whitespace, consume all contiguous whitespace till newline
+		} else if isWhitespace(c) {
+			// if leading whitespace, consume all contiguous whitespace till newline
 			s.skipWhitespace()
 		} else if isStartOfComment(c) {
 			// if start of comment, extract the comment
-			var err error
-			documentation, err = s.readDocumentation()
+			documentation, err := s.readDocumentation()
 			if err != nil {
-				fmt.Printf(err.Error() + "\n")
-				os.Exit(-1)
+				return "", err
 			}
-			fmt.Printf("Documentation: %v \n\n", documentation)
-		} else if isLetter(c) {
+			return documentation, nil
+		} else if isLetter(c) || isDigit(c) {
+			// this is not documentation, break out of the loop...
 			s.unread()
-			decl, err := s.readDeclaration(pf, documentation)
-			if err != nil {
-				fmt.Printf("Error: " + err.Error() + "\n")
-				os.Exit(-1)
-			}
-
-			if decl == typeElem {
-				//TODO: scan for "declaration" and handle each type accordingly
-			}
-		} else if isDigit(c) {
-			//s.unread()
-			//TODO: This is illegal, right!
+			break
 		}
 	}
+	return "", nil
 }
 
 //TODO: handle all possible values of "label"
-func (s *scanner) readDeclaration(pf *ProtoFile, documentation string) (declaration, error) {
+func (s *scanner) readDeclaration(pf *ProtoFile, documentation string) error {
 	label := s.readWord()
 	if label == "package" {
 		s.skipWhitespace()
 		pf.PackageName = s.readWord()
 	} else if label == "syntax" {
 		if err := s.readSyntax(pf); err != nil {
-			return unknownElem, err
+			return err
 		}
 	} else if label == "import" {
 		//TODO: implement this later
 	} else if label == "message" {
 		if err := s.readMessage(pf, documentation); err != nil {
-			return unknownElem, err
+			return err
 		}
 	} else if label == "enum" {
 		if err := s.readEnum(pf, documentation); err != nil {
-			return unknownElem, err
+			return err
 		}
 	}
 
-	//TODO: fix this return...
-	return unknownElem, nil
+	return nil
 }
 
 func (s *scanner) readMessage(pf *ProtoFile, documentation string) error {
@@ -323,6 +335,13 @@ func (s *scanner) skipWhitespace() {
 	}
 }
 
+func finishIfNecessary(err error) {
+	if err != nil {
+		fmt.Printf("Error: " + err.Error() + "\n")
+		os.Exit(-1)
+	}
+}
+
 func isValidCharInWord(c rune) bool {
 	return isLetter(c) || isDigit(c) || c == '_' || c == '-' || c == '.'
 }
@@ -344,3 +363,4 @@ func isDigit(c rune) bool {
 }
 
 var eof = rune(0)
+var eofReached bool
