@@ -7,18 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
-)
-
-// the various types of declarations, that we scan for...
-type declaration int
-
-const (
-	typeElem declaration = iota
-	serviceElem
-	optioneElem
-	extendElem
-	unknownElem
 )
 
 // ProtoFile ...
@@ -49,11 +39,19 @@ type OptionElement struct {
 	Kind  Kind
 }
 
+// EnumConstantElement ...
+type EnumConstantElement struct {
+	Name          string
+	Tag           int
+	Documentation string
+}
+
 // EnumElement ...
 type EnumElement struct {
 	Name          string
 	Documentation string
 	Options       []OptionElement
+	EnumConstants []EnumConstantElement
 }
 
 // ParseFile ...
@@ -76,7 +74,8 @@ func ParseFile(filePath string) (ProtoFile, error) {
 	return pf, nil
 }
 
-/* This method just looks for documentation and then declaration in a loop till EOF is reached */
+// This method just looks for documentation and
+// then declaration in a loop till EOF is reached
 func (s *scanner) scan(pf *ProtoFile) {
 	for {
 		// read any documentation if found...
@@ -98,7 +97,7 @@ func (s *scanner) scan(pf *ProtoFile) {
 		}
 
 		// read any declaration...
-		err = s.readDeclaration(pf, documentation)
+		err = s.readDeclaration(pf, documentation, ParseContext{CtxType: fileCtx})
 		finishIfNecessary(err)
 		if eofReached {
 			break
@@ -142,25 +141,60 @@ func (s *scanner) readDocumentationIfFound() (string, error) {
 }
 
 //TODO: handle all possible values of "label"
-func (s *scanner) readDeclaration(pf *ProtoFile, documentation string) error {
+func (s *scanner) readDeclaration(pf *ProtoFile, documentation string, ctx ParseContext) error {
+	// Skip unnecessary semicolons...
+	c := s.read()
+	if c == ';' {
+		return nil
+	}
+	s.unread()
+
+	// Read next label...
 	label := s.readWord()
 	if label == "package" {
+		if !ctx.permitsPackage() {
+			return errors.New("Unexpected 'package' in context: " + string(ctx.CtxType))
+		}
 		s.skipWhitespace()
 		pf.PackageName = s.readWord()
 	} else if label == "syntax" {
+		if !ctx.permitsSyntax() {
+			return errors.New("Unexpected 'syntax' in context: " + string(ctx.CtxType))
+		}
 		if err := s.readSyntax(pf); err != nil {
 			return err
 		}
 	} else if label == "import" {
-		//TODO: implement this later
-	} else if label == "message" {
-		if err := s.readMessage(pf, documentation); err != nil {
-			return err
+		if !ctx.permitsImport() {
+			return errors.New("Unexpected 'import' in context: " + string(ctx.CtxType))
 		}
+		//TODO: implement this later
+	} else if label == "option" {
+		//TODO: implement this later
 	} else if label == "enum" {
 		if err := s.readEnum(pf, documentation); err != nil {
 			return err
 		}
+	} else if label == "message" {
+		if err := s.readMessage(pf, documentation); err != nil {
+			return err
+		}
+	} else if ctx.CtxType == enumCtx {
+		s.skipWhitespace()
+		if c := s.read(); c != '=' {
+			msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), s.loc.line, s.loc.column)
+			return errors.New(msg)
+		}
+		s.skipWhitespace()
+
+		tag, err := s.readInt()
+		if err != nil {
+			return err
+		}
+
+		ee := ctx.Obj.(*EnumElement)
+		ec := EnumConstantElement{Name: label, Tag: tag, Documentation: documentation}
+		ee.EnumConstants = append(ee.EnumConstants, ec)
 	}
 
 	return nil
@@ -172,14 +206,51 @@ func (s *scanner) readMessage(pf *ProtoFile, documentation string) error {
 }
 
 func (s *scanner) readEnum(pf *ProtoFile, documentation string) error {
-	//TODO: implement this...
+	name, err := s.readName()
+	if err != nil {
+		return err
+	}
+	ee := EnumElement{Name: name}
+	if documentation != "" {
+		ee.Documentation = documentation
+	}
+
+	s.skipWhitespace()
+
+	if c := s.read(); c != '{' {
+		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), s.loc.line, s.loc.column)
+		return errors.New(msg)
+	}
+
+	for {
+		valueDocumentation, err := s.readDocumentationIfFound()
+		if err != nil {
+			return err
+		}
+		if eofReached {
+			break
+		}
+		if c := s.read(); c == '}' {
+			break
+		}
+		s.unread()
+
+		ctx := ParseContext{CtxType: enumCtx, Obj: &ee}
+		err = s.readDeclaration(pf, valueDocumentation, ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	pf.Enums = append(pf.Enums, ee)
+
 	return nil
 }
 
 func (s *scanner) readSyntax(pf *ProtoFile) error {
 	s.skipWhitespace()
 	if c := s.read(); c != '=' {
-		msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+		msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), s.loc.line, s.loc.column)
 		return errors.New(msg)
 	}
 	s.skipWhitespace()
@@ -191,7 +262,7 @@ func (s *scanner) readSyntax(pf *ProtoFile) error {
 		return errors.New("'syntax' must be 'proto2' or 'proto3'. Found: " + syntax)
 	}
 	if c := s.read(); c != ';' {
-		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), s.loc.line, s.loc.column)
 		return errors.New(msg)
 	}
 	pf.Syntax = syntax
@@ -200,12 +271,12 @@ func (s *scanner) readSyntax(pf *ProtoFile) error {
 
 func (s *scanner) readQuotedString() (string, error) {
 	if c := s.read(); c != '"' {
-		msg := fmt.Sprintf("Expected starting '\"', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+		msg := fmt.Sprintf("Expected starting '\"', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), s.loc.line, s.loc.column)
 		return "", errors.New(msg)
 	}
 	str := s.readWord()
 	if c := s.read(); c != '"' {
-		msg := fmt.Sprintf("Expected ending '\"', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+		msg := fmt.Sprintf("Expected ending '\"', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), s.loc.line, s.loc.column)
 		return "", errors.New(msg)
 	}
 	return str, nil
@@ -248,6 +319,22 @@ func (s *scanner) readWord() string {
 	return buf.String()
 }
 
+func (s *scanner) readInt() (int, error) {
+	var buf bytes.Buffer
+	for {
+		c := s.read()
+		if isDigit(c) {
+			buf.WriteRune(c)
+		} else {
+			s.unread()
+			break
+		}
+	}
+	str := buf.String()
+	intVal, err := strconv.Atoi(str)
+	return intVal, err
+}
+
 func (s *scanner) readDocumentation() (string, error) {
 	c := s.read()
 	if c == '/' {
@@ -256,7 +343,7 @@ func (s *scanner) readDocumentation() (string, error) {
 		return s.readMultiLineComment(), nil
 	}
 
-	msg := fmt.Sprintf("Expected '/' or '*', but found: %v on line: %v, column: %v", c, s.loc.line, s.loc.column)
+	msg := fmt.Sprintf("Expected '/' or '*', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), s.loc.line, s.loc.column)
 	err := errors.New(msg)
 	return "", err
 }
@@ -361,7 +448,7 @@ func isStartOfComment(c rune) bool {
 }
 
 func isWhitespace(c rune) bool {
-	return c == ' ' || c == '\t'
+	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
 }
 
 func isLetter(c rune) bool {
