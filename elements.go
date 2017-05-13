@@ -7,25 +7,25 @@ type ProtoFile struct {
 	Enums       []EnumElement
 }
 
-// Kind the kind of option
-type Kind int
+// OptionKind the kind of option
+type OptionKind int
 
-// Kind the associated types
+// OptionKind the supported kinds
 const (
-	STRING Kind = iota
-	BOOLEAN
-	NUMBER
-	ENUM
-	MAP
-	LIST
-	OPTION
+	StringOption OptionKind = iota
+	BoolOption
+	NumberOption
+	EnumOption
+	MapOption
+	ListOption
+	OptionOption
 )
 
 // OptionElement ...
 type OptionElement struct {
 	Name  string
 	Value int
-	Kind  Kind
+	Kind  OptionKind
 }
 
 // EnumConstantElement ...
