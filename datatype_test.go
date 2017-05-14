@@ -17,7 +17,7 @@ func TestDataType(t *testing.T) {
 	initScalarDataType()
 
 	for _, tt := range tests {
-		x := GetScalarType(tt.s)
+		x := getScalarType(tt.s)
 		fmt.Printf("Scalar Type: %v for input string: %v \n", x, tt.s)
 	}
 }

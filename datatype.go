@@ -78,7 +78,7 @@ func (sdt *ScalarDataType) Kind() DataTypeKind {
 	return ScalarDataTypeKind
 }
 
-// GetScalarType returns the ScalarType for the given stringified version
-func GetScalarType(s string) ScalarType {
+// getScalarType returns the ScalarType for the given stringified version
+func getScalarType(s string) ScalarType {
 	return scalarTypeKeywords[strings.ToLower(s)]
 }
