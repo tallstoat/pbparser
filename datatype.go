@@ -80,17 +80,17 @@ type ScalarDataType struct {
 }
 
 // Kind method from interface DataType
-func (sdt *ScalarDataType) Kind() DataTypeKind {
+func (sdt ScalarDataType) Kind() DataTypeKind {
 	return ScalarDataTypeKind
 }
 
 // Name method from interface DataType
-func (sdt *ScalarDataType) Name() string {
+func (sdt ScalarDataType) Name() string {
 	return sdt.name
 }
 
 // getScalarType return the scalarType of a SclataDataType
-func (sdt *ScalarDataType) getScalarType() ScalarType {
+func (sdt ScalarDataType) getScalarType() ScalarType {
 	return sdt.scalarType
 }
 
@@ -117,12 +117,12 @@ type MapDataType struct {
 }
 
 // Kind method from interface DataType
-func (mdt *MapDataType) Kind() DataTypeKind {
+func (mdt MapDataType) Kind() DataTypeKind {
 	return MapDataTypeKind
 }
 
 // Name method from interface DataType
-func (mdt *MapDataType) Name() string {
+func (mdt MapDataType) Name() string {
 	return "map<" + mdt.keyType.Name() + ", " + mdt.valueType.Name() + ">"
 }
 
@@ -132,11 +132,11 @@ type NamedDataType struct {
 }
 
 // Kind method from interface DataType
-func (ndt *NamedDataType) Kind() DataTypeKind {
+func (ndt NamedDataType) Kind() DataTypeKind {
 	return NamedDataTypeKind
 }
 
 // Name method from interface DataType
-func (ndt *NamedDataType) Name() string {
+func (ndt NamedDataType) Name() string {
 	return ndt.name
 }

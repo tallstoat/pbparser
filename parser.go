@@ -132,12 +132,27 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		//TODO: implement this later
 	} else if label == "option" {
 		//TODO: implement this later
+	} else if label == "message" {
+		if err := p.readMessage(pf, documentation); err != nil {
+			return err
+		}
 	} else if label == "enum" {
 		if err := p.readEnum(pf, documentation); err != nil {
 			return err
 		}
-	} else if label == "message" {
-		if err := p.readMessage(pf, documentation); err != nil {
+	} else if label == "extend" {
+		if err := p.readExtend(pf, documentation); err != nil {
+			return err
+		}
+	} else if label == "service" {
+		if err := p.readService(pf, documentation); err != nil {
+			return err
+		}
+	} else if label == "rpc" {
+		if !ctx.permitsRPC() {
+			return errors.New("Unexpected 'rpc' in context: " + string(ctx.ctxType))
+		}
+		if err := p.readRPC(pf, documentation); err != nil {
 			return err
 		}
 	} else if ctx.ctxType == enumCtx {
@@ -163,6 +178,21 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 
 func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 	//TODO: implement after handling "message" elements...
+	return nil
+}
+
+func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
+	//TODO: implement this...
+	return nil
+}
+
+func (p *parser) readService(pf *ProtoFile, documentation string) error {
+	//TODO: implement this...
+	return nil
+}
+
+func (p *parser) readRPC(pf *ProtoFile, documentation string) error {
+	//TODO: implement this...
 	return nil
 }
 
@@ -241,6 +271,47 @@ func (p *parser) readQuotedString() (string, error) {
 		return "", errors.New(msg)
 	}
 	return str, nil
+}
+
+func (p *parser) readDataType() (DataType, error) {
+	name := p.readWord()
+	p.skipWhitespace()
+
+	// is it a map type?
+	if name == "map" {
+		if c := p.read(); c != '<' {
+			msg := fmt.Sprintf("Expected '<', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+			return nil, errors.New(msg)
+		}
+		var err error
+		var keyType, valueType DataType
+		keyType, err = p.readDataType()
+		if err != nil {
+			return nil, err
+		}
+		if c := p.read(); c != ',' {
+			msg := fmt.Sprintf("Expected ',', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+			return nil, errors.New(msg)
+		}
+		valueType, err = p.readDataType()
+		if err != nil {
+			return nil, err
+		}
+		if c := p.read(); c != '>' {
+			msg := fmt.Sprintf("Expected '>', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+			return nil, errors.New(msg)
+		}
+		return MapDataType{keyType: keyType, valueType: valueType}, nil
+	}
+
+	// is it a scalar type?
+	sdt, err := NewScalarDataType(name)
+	if err == nil {
+		return sdt, nil
+	}
+
+	// must be a named type
+	return NamedDataType{name: name}, nil
 }
 
 func (p *parser) readName() (string, error) {
