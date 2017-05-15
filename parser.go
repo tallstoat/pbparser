@@ -25,8 +25,6 @@ func ParseFile(filePath string) (ProtoFile, error) {
 	r := strings.NewReader(s)
 	br := bufio.NewReader(r)
 
-	initScalarDataType()
-
 	loc := location{}
 	parser := parser{br: br, loc: &loc}
 	parser.parser(&pf)
