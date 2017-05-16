@@ -5,6 +5,7 @@ type ProtoFile struct {
 	PackageName string
 	Syntax      string
 	Enums       []EnumElement
+	Services    []ServiceElement
 }
 
 // OptionKind the kind of option
@@ -41,4 +42,21 @@ type EnumElement struct {
 	Documentation string
 	Options       []OptionElement
 	EnumConstants []EnumConstantElement
+}
+
+// RPCElement ...
+type RPCElement struct {
+	Name          string
+	Documentation string
+	Options       []OptionElement
+	RequestType   NamedDataType
+	ResponseType  NamedDataType
+}
+
+// ServiceElement ...
+type ServiceElement struct {
+	Name          string
+	Documentation string
+	Options       []OptionElement
+	RPCs          []RPCElement
 }
