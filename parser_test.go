@@ -25,6 +25,16 @@ func TestParseFile(t *testing.T) {
 
 		fmt.Println("Syntax: " + pf.Syntax)
 		fmt.Println("PackageName: " + pf.PackageName)
+		for _, s := range pf.Services {
+			fmt.Println("Service: " + s.Name)
+			fmt.Println("Doc: " + s.Documentation)
+			for _, rpc := range s.RPCs {
+				fmt.Println("Name: " + rpc.Name)
+				fmt.Println("Doc: " + rpc.Documentation)
+				fmt.Println("RequestType: " + rpc.RequestType.Name())
+				fmt.Println("ResponseType: " + rpc.ResponseType.Name())
+			}
+		}
 		for _, en := range pf.Enums {
 			fmt.Println("Enum: " + en.Name)
 			fmt.Println("Doc: " + en.Documentation)
