@@ -56,11 +56,6 @@ func (p *parser) parser(pf *ProtoFile) {
 			break
 		}
 
-		// TODO: remove it later; print the documentation just for informational purposes...
-		if documentation != "" {
-			fmt.Printf("Documentation: %v \n\n", documentation)
-		}
-
 		// skip any intervening whitespace if present...
 		p.skipWhitespace()
 		if eofReached {
@@ -187,7 +182,43 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 }
 
 func (p *parser) readService(pf *ProtoFile, documentation string) error {
-	//TODO: implement this...
+	name, err := p.readName()
+	if err != nil {
+		return err
+	}
+	p.skipWhitespace()
+	if c := p.read(); c != '{' {
+		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	se := ServiceElement{Name: name}
+	if documentation != "" {
+		se.Documentation = documentation
+	}
+
+	for {
+		rpcDocumentation, err := p.readDocumentationIfFound()
+		if err != nil {
+			return err
+		}
+		if eofReached {
+			break
+		}
+		if c := p.read(); c == '}' {
+			break
+		}
+		p.unread()
+
+		ctx := parseCtx{ctxType: serviceCtx, obj: &se}
+		err = p.readDeclaration(pf, rpcDocumentation, ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	pf.Services = append(pf.Services, se)
+
 	return nil
 }
 
