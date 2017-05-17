@@ -11,6 +11,9 @@ import (
 	"strings"
 )
 
+// The current package name + nested type names, separated by dots
+var prefix string
+
 // ParseFile This method is to be called with the path
 // of the proto file to be parsed.
 func ParseFile(filePath string) (ProtoFile, error) {
@@ -113,6 +116,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 		p.skipWhitespace()
 		pf.PackageName = p.readWord()
+		prefix = pf.PackageName + "."
 	} else if label == "syntax" {
 		if !ctx.permitsSyntax() {
 			msg := fmt.Sprintf("Unexpected 'syntax' in context: %v", ctx.ctxType)
@@ -197,7 +201,7 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 		return errors.New(msg)
 	}
 
-	se := ServiceElement{Name: name}
+	se := ServiceElement{Name: name, QualifiedName: prefix + name}
 	if documentation != "" {
 		se.Documentation = documentation
 	}
@@ -329,7 +333,7 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 	if err != nil {
 		return err
 	}
-	ee := EnumElement{Name: name}
+	ee := EnumElement{Name: name, QualifiedName: prefix + name}
 	if documentation != "" {
 		ee.Documentation = documentation
 	}

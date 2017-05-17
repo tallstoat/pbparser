@@ -29,6 +29,7 @@ func TestParseFile(t *testing.T) {
 		for _, s := range pf.Services {
 			fmt.Println()
 			fmt.Println("Service: " + s.Name)
+			fmt.Println("QualifiedName: " + s.QualifiedName)
 			fmt.Println("Doc: " + s.Documentation)
 			for _, rpc := range s.RPCs {
 				fmt.Println()
@@ -41,6 +42,7 @@ func TestParseFile(t *testing.T) {
 		for _, en := range pf.Enums {
 			fmt.Println()
 			fmt.Println("Enum: " + en.Name)
+			fmt.Println("QualifiedName: " + en.QualifiedName)
 			fmt.Println("Doc: " + en.Documentation)
 			for _, enc := range en.EnumConstants {
 				fmt.Println("Name: " + enc.Name)
