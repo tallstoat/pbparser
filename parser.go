@@ -96,7 +96,6 @@ func (p *parser) readDocumentationIfFound() (string, error) {
 	return "", nil
 }
 
-//TODO: handle all possible values of "label"
 func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	// Skip unnecessary semicolons...
 	c := p.read()
@@ -177,7 +176,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 }
 
 func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
-	//TODO: implement after handling "message" elements...
+	//TODO: implement this...
 	return nil
 }
 
