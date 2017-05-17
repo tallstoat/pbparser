@@ -109,20 +109,23 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 	label := p.readWord()
 	if label == "package" {
 		if !ctx.permitsPackage() {
-			return errors.New("Unexpected 'package' in context: " + string(ctx.ctxType))
+			msg := fmt.Sprintf("Unexpected 'package' in context: %v", ctx.ctxType)
+			return errors.New(msg)
 		}
 		p.skipWhitespace()
 		pf.PackageName = p.readWord()
 	} else if label == "syntax" {
 		if !ctx.permitsSyntax() {
-			return errors.New("Unexpected 'syntax' in context: " + string(ctx.ctxType))
+			msg := fmt.Sprintf("Unexpected 'syntax' in context: %v", ctx.ctxType)
+			return errors.New(msg)
 		}
 		if err := p.readSyntax(pf); err != nil {
 			return err
 		}
 	} else if label == "import" {
 		if !ctx.permitsImport() {
-			return errors.New("Unexpected 'import' in context: " + string(ctx.ctxType))
+			msg := fmt.Sprintf("Unexpected 'import' in context: %v", ctx.ctxType)
+			return errors.New(msg)
 		}
 		//TODO: implement this later
 	} else if label == "option" {
@@ -145,9 +148,11 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 	} else if label == "rpc" {
 		if !ctx.permitsRPC() {
-			return errors.New("Unexpected 'rpc' in context: " + string(ctx.ctxType))
+			msg := fmt.Sprintf("Unexpected 'rpc' in context: %v", ctx.ctxType)
+			return errors.New(msg)
 		}
-		if err := p.readRPC(pf, documentation); err != nil {
+		se := ctx.obj.(*ServiceElement)
+		if err := p.readRPC(pf, se, documentation); err != nil {
 			return err
 		}
 	} else if ctx.ctxType == enumCtx {
@@ -182,6 +187,7 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 }
 
 func (p *parser) readService(pf *ProtoFile, documentation string) error {
+	p.skipWhitespace()
 	name, err := p.readName()
 	if err != nil {
 		return err
@@ -222,12 +228,104 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 	return nil
 }
 
-func (p *parser) readRPC(pf *ProtoFile, documentation string) error {
-	//TODO: implement this...
+func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string) error {
+	p.skipWhitespace()
+	name, err := p.readName()
+	if err != nil {
+		return err
+	}
+
+	rpc := RPCElement{Name: name, Documentation: documentation}
+
+	p.skipWhitespace()
+	if c := p.read(); c != '(' {
+		msg := fmt.Sprintf("Expected '(', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	// parse request type...
+	var requestType DataType
+	requestType, err = p.readDataType()
+	if err != nil {
+		return err
+	}
+	if requestType.Kind() != NamedDataTypeKind {
+		msg := fmt.Sprintf("Expected named requestType, but found: %v", requestType.Kind())
+		return errors.New(msg)
+	}
+	rpc.RequestType = requestType.(NamedDataType)
+	if c := p.read(); c != ')' {
+		msg := fmt.Sprintf("Expected ')', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	p.skipWhitespace()
+	keyword := p.readWord()
+	if keyword != "returns" {
+		msg := fmt.Sprintf("Expected 'returns', but found: %v on line: %v", keyword, p.loc.line)
+		return errors.New(msg)
+	}
+
+	p.skipWhitespace()
+	if c := p.read(); c != '(' {
+		msg := fmt.Sprintf("Expected '(', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	// parse response type...
+	var responseType DataType
+	responseType, err = p.readDataType()
+	if err != nil {
+		return err
+	}
+	if responseType.Kind() != NamedDataTypeKind {
+		msg := fmt.Sprintf("Expected named responseType, but found: %v", responseType.Kind())
+		return errors.New(msg)
+	}
+	rpc.ResponseType = responseType.(NamedDataType)
+	if c := p.read(); c != ')' {
+		msg := fmt.Sprintf("Expected ')', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	p.skipWhitespace()
+	c := p.read()
+	if c == '{' {
+		for {
+			c2 := p.read()
+			if c2 == '}' {
+				break
+			}
+			p.unread()
+
+			if eofReached {
+				break
+			}
+
+			rpcDocumentation, err := p.readDocumentationIfFound()
+			if err != nil {
+				return err
+			}
+
+			//parse for options...
+			ctx := parseCtx{ctxType: rpcCtx, obj: &rpc}
+			err = p.readDeclaration(pf, rpcDocumentation, ctx)
+			if err != nil {
+				return err
+			}
+		}
+	} else if c != ';' {
+		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	se.RPCs = append(se.RPCs, rpc)
+
 	return nil
 }
 
 func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
+	p.skipWhitespace()
 	name, err := p.readName()
 	if err != nil {
 		return err
@@ -363,6 +461,7 @@ func (p *parser) readName() (string, error) {
 		}
 		p.unread()
 	} else {
+		p.unread()
 		name = p.readWord()
 	}
 	return name, nil
