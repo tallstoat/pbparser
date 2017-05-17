@@ -1,0 +1,12 @@
+/* Task object blah blah adsd
+sfsf fafasf affaf fasfaf
+*/
+syntax = "proto3";
+package logtask;
+
+// EnumAllowingAlias docs for testing...
+enum EnumAllowingAlias {
+  UNKNOWN = 0;
+  STARTED = 1;
+  RUNNING = 2;
+}

@@ -11,7 +11,7 @@ func TestParseFile(t *testing.T) {
 	var tests = []struct {
 		file string
 	}{
-		{file: "./resources/test.proto"},
+		{file: "./resources/service.proto"},
 	}
 
 	for i, tt := range tests {
@@ -25,17 +25,21 @@ func TestParseFile(t *testing.T) {
 
 		fmt.Println("Syntax: " + pf.Syntax)
 		fmt.Println("PackageName: " + pf.PackageName)
+
 		for _, s := range pf.Services {
+			fmt.Println()
 			fmt.Println("Service: " + s.Name)
 			fmt.Println("Doc: " + s.Documentation)
 			for _, rpc := range s.RPCs {
-				fmt.Println("Name: " + rpc.Name)
+				fmt.Println()
+				fmt.Println("RPC: " + rpc.Name)
 				fmt.Println("Doc: " + rpc.Documentation)
 				fmt.Println("RequestType: " + rpc.RequestType.Name())
 				fmt.Println("ResponseType: " + rpc.ResponseType.Name())
 			}
 		}
 		for _, en := range pf.Enums {
+			fmt.Println()
 			fmt.Println("Enum: " + en.Name)
 			fmt.Println("Doc: " + en.Documentation)
 			for _, enc := range en.EnumConstants {
@@ -44,7 +48,7 @@ func TestParseFile(t *testing.T) {
 			}
 		}
 
-		fmt.Printf("Finished test: %v \n", i)
+		fmt.Printf("\nFinished test: %v \n", i)
 	}
 
 	fmt.Println("done")
