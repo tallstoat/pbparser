@@ -57,23 +57,11 @@ type ServiceElement struct {
 	RPCs          []RPCElement
 }
 
-// Label for a field element
-type Label int
-
-// Label for a field element
-const (
-	OptionalLabel Label = iota
-	RequiredLabel
-	RepeatedLabel
-	/* Indicates the field is a member of a OneOf block */
-	OneOfLabel
-)
-
 // FieldElement ...
 type FieldElement struct {
 	Name          string
 	Documentation string
-	Label         Label
+	Label         string /* optional, required, repeated, oneof */
 	Type          DataType
 	Tag           int
 	Options       []OptionElement
