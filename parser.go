@@ -90,7 +90,7 @@ func (p *parser) readDocumentationIfFound() (string, error) {
 				return "", err
 			}
 			return documentation, nil
-		} else if isLetter(c) || isDigit(c) {
+		} else {
 			// this is not documentation, break out of the loop...
 			p.unread()
 			break
@@ -158,6 +158,13 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		if err := p.readRPC(pf, se, documentation); err != nil {
 			return err
 		}
+	} else if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx {
+		if !ctx.permitsField() {
+			return errors.New("fields must be nested")
+		}
+		if err := p.readField(pf, label, documentation, ctx); err != nil {
+			return err
+		}
 	} else if ctx.ctxType == enumCtx {
 		p.skipWhitespace()
 		if c := p.read(); c != '=' {
@@ -179,8 +186,126 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 	return nil
 }
 
+func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
+	if label == "optional" && pf.Syntax == "proto3" {
+		return errors.New("Explicit 'optional' labels are disallowed in the Proto3 syntax. " +
+			"To define 'optional' fields in Proto3, simply remove the 'optional' label, as fields " +
+			"are 'optional' by default.")
+	}
+
+	// the field struct...
+	fe := FieldElement{Documentation: documentation}
+
+	// the string representation of the datatype
+	var dataTypeStr string
+
+	// figure out dataTypeStr based on the label...
+	if label == "required" || label == "optional" || label == "repeated" {
+		fe.Label = label
+		p.skipWhitespace()
+		dataTypeStr = p.readWord()
+	} else {
+		dataTypeStr = label
+	}
+
+	// figure out the dataType
+	dataType, err := p.readDataTypeInternal(dataTypeStr)
+	if err != nil {
+		return err
+	}
+	fe.Type = dataType
+
+	// figure out the name
+	p.skipWhitespace()
+	name, err := p.readName()
+	if err != nil {
+		return err
+	}
+	fe.Name = name
+
+	// check for equals sign...
+	p.skipWhitespace()
+	if c := p.read(); c != '=' {
+		msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	// extract the field tag...
+	p.skipWhitespace()
+	tag, err := p.readInt()
+	if err != nil {
+		return err
+	}
+	fe.Tag = tag
+
+	// read the semicolon
+	p.skipWhitespace()
+	if c := p.read(); c != ';' {
+		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	// add field to the proper parent...
+	if ctx.ctxType == msgCtx {
+		me := ctx.obj.(*MessageElement)
+		me.Fields = append(me.Fields, fe)
+	} else if ctx.ctxType == extendCtx {
+		ee := ctx.obj.(*ExtendElement)
+		ee.Fields = append(ee.Fields, fe)
+	}
+
+	return nil
+}
+
 func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
-	//TODO: implement this...
+	p.skipWhitespace()
+	name, err := p.readName()
+	if err != nil {
+		return err
+	}
+
+	me := MessageElement{Name: name, QualifiedName: prefix + name, Documentation: documentation}
+
+	// store previous prefix...
+	var previousPrefix string
+	previousPrefix = prefix
+
+	// update prefix...
+	prefix = prefix + name + "."
+
+	// reset prefix when we are done processing all fields in the message...
+	defer func() {
+		prefix = previousPrefix
+	}()
+
+	p.skipWhitespace()
+	if c := p.read(); c != '{' {
+		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	for {
+		nestedDocumentation, err := p.readDocumentationIfFound()
+		if err != nil {
+			return err
+		}
+		if eofReached {
+			break
+		}
+		if c := p.read(); c == '}' {
+			break
+		}
+		p.unread()
+
+		ctx := parseCtx{ctxType: msgCtx, obj: &me}
+		err = p.readDeclaration(pf, nestedDocumentation, ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	pf.Messages = append(pf.Messages, me)
+
 	return nil
 }
 
@@ -408,7 +533,10 @@ func (p *parser) readQuotedString() (string, error) {
 func (p *parser) readDataType() (DataType, error) {
 	name := p.readWord()
 	p.skipWhitespace()
+	return p.readDataTypeInternal(name)
+}
 
+func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 	// is it a map type?
 	if name == "map" {
 		if c := p.read(); c != '<' {
