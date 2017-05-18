@@ -26,6 +26,23 @@ func TestParseFile(t *testing.T) {
 		fmt.Println("Syntax: " + pf.Syntax)
 		fmt.Println("PackageName: " + pf.PackageName)
 
+		for _, m := range pf.Messages {
+			fmt.Println()
+			fmt.Println("Message: " + m.Name)
+			fmt.Println("QualifiedName: " + m.QualifiedName)
+			fmt.Println("Doc: " + m.Documentation)
+			for _, f := range m.Fields {
+				fmt.Println()
+				fmt.Println("Field: " + f.Name)
+				if f.Label != "" {
+					fmt.Println("Label: " + f.Label)
+				}
+				fmt.Printf("Type: %v\n", f.Type)
+				fmt.Printf("Tag: %v\n", f.Tag)
+				fmt.Println("Doc: " + f.Documentation)
+			}
+		}
+
 		for _, s := range pf.Services {
 			fmt.Println()
 			fmt.Println("Service: " + s.Name)
@@ -39,6 +56,7 @@ func TestParseFile(t *testing.T) {
 				fmt.Println("ResponseType: " + rpc.ResponseType.Name())
 			}
 		}
+
 		for _, en := range pf.Enums {
 			fmt.Println()
 			fmt.Println("Enum: " + en.Name)

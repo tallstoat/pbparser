@@ -12,6 +12,11 @@ service LogTask {
   rpc DeleteTask(TaskId) returns (ReturnStatus) {}
 }
 
+// Id of the Task...
+message TaskId {
+  string id = 1;
+}
+
 // Task object...
 message Task {
   string name = 1;
@@ -25,11 +30,6 @@ message Task {
   string location = 9;
   repeated string tags = 10;  
   repeated string comments = 11;  
-}
-
-// Id of the Task...
-message TaskId {
-  string id = 1;
 }
 
 // List of tasks...
