@@ -130,7 +130,32 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 			msg := fmt.Sprintf("Unexpected 'import' in context: %v", ctx.ctxType)
 			return errors.New(msg)
 		}
-		//TODO: implement this later
+		p.skipWhitespace()
+		c := p.read()
+		p.unread()
+		if c == '"' {
+			importString, err := p.readQuotedString()
+			if err != nil {
+				return err
+			}
+			pf.Dependencies = append(pf.Dependencies, importString)
+		} else {
+			publicStr := p.readWord()
+			if "public" != publicStr {
+				msg := fmt.Sprintf("Expected 'public', but found: %v on line: %v", publicStr, p.loc.line)
+				return errors.New(msg)
+			}
+			p.skipWhitespace()
+			importString, err := p.readQuotedString()
+			if err != nil {
+				return err
+			}
+			pf.PublicDependencies = append(pf.PublicDependencies, importString)
+		}
+		if c := p.read(); c != ';' {
+			msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+			return errors.New(msg)
+		}
 	} else if label == "option" {
 		//TODO: implement this later
 	} else if label == "message" {
@@ -696,6 +721,7 @@ func (p *parser) skipUntilNewline() {
 
 func (p *parser) unread() {
 	_ = p.br.UnreadRune()
+	p.loc.column--
 }
 
 func (p *parser) read() rune {

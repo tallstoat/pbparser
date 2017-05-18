@@ -26,6 +26,16 @@ func TestParseFile(t *testing.T) {
 		fmt.Println("Syntax: " + pf.Syntax)
 		fmt.Println("PackageName: " + pf.PackageName)
 
+		for _, d := range pf.Dependencies {
+			fmt.Println()
+			fmt.Println("Dependency: " + d)
+		}
+
+		for _, d := range pf.PublicDependencies {
+			fmt.Println()
+			fmt.Println("PublicDependency: " + d)
+		}
+
 		for _, m := range pf.Messages {
 			fmt.Println()
 			fmt.Println("Message: " + m.Name)
