@@ -35,6 +35,10 @@ message Task {
   repeated string comments = 11;  
 }
 
+extend Task {
+  int32 bar = 126;
+}
+
 // List of tasks...
 message TaskList {
   repeated Task tasks = 1;

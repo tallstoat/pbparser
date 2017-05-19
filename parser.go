@@ -335,7 +335,45 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 }
 
 func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
-	//TODO: implement this...
+	p.skipWhitespace()
+	name, err := p.readName()
+	if err != nil {
+		return err
+	}
+	qualifiedName := name
+	if !strings.Contains(name, ".") && prefix != "" {
+		qualifiedName = prefix + name
+	}
+	ee := ExtendElement{Name: name, QualifiedName: qualifiedName, Documentation: documentation}
+
+	p.skipWhitespace()
+	if c := p.read(); c != '{' {
+		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	for {
+		nestedDocumentation, err := p.readDocumentationIfFound()
+		if err != nil {
+			return err
+		}
+		if eofReached {
+			break
+		}
+		if c := p.read(); c == '}' {
+			break
+		}
+		p.unread()
+
+		ctx := parseCtx{ctxType: extendCtx, obj: &ee}
+		err = p.readDeclaration(pf, nestedDocumentation, ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	pf.ExtendDeclarations = append(pf.ExtendDeclarations, ee)
+
 	return nil
 }
 

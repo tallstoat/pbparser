@@ -53,6 +53,23 @@ func TestParseFile(t *testing.T) {
 			}
 		}
 
+		for _, ed := range pf.ExtendDeclarations {
+			fmt.Println()
+			fmt.Println("Extend: " + ed.Name)
+			fmt.Println("QualifiedName: " + ed.QualifiedName)
+			fmt.Println("Doc: " + ed.Documentation)
+			for _, f := range ed.Fields {
+				fmt.Println()
+				fmt.Println("Field: " + f.Name)
+				if f.Label != "" {
+					fmt.Println("Label: " + f.Label)
+				}
+				fmt.Printf("Type: %v\n", f.Type)
+				fmt.Printf("Tag: %v\n", f.Tag)
+				fmt.Println("Doc: " + f.Documentation)
+			}
+		}
+
 		for _, s := range pf.Services {
 			fmt.Println()
 			fmt.Println("Service: " + s.Name)
