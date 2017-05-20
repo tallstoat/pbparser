@@ -13,7 +13,7 @@ service LogTask {
   rpc ListTasks(TaskListOptions) returns (TaskList) {}
   rpc UpdateTask(TaskUpdateOptions) returns (ReturnStatus) {}
   rpc DeleteTask(TaskId) returns (ReturnStatus) {}
-  rpc RouteChat(stream RouteNote) returns (stream RouteNote) {}
+  rpc RouteChat(int32) returns (stream int32) {}
 }
 
 // Id of the Task...
@@ -60,7 +60,7 @@ message TaskListOptions {
 message TaskUpdateOptions {
   TaskId taskId = 1;
   Task task = 2;
-  reserved 10, 12, 9 to 11;
+  reserved 13, 12, 9 to 11;
 }
 
 // Return status of delete and update task operations...

@@ -109,8 +109,16 @@ func TestParseFile(t *testing.T) {
 				fmt.Println()
 				fmt.Println("RPC: " + rpc.Name)
 				fmt.Println("Doc: " + rpc.Documentation)
-				fmt.Println("RequestType: " + rpc.RequestType.Name())
-				fmt.Println("ResponseType: " + rpc.ResponseType.Name())
+				if rpc.RequestType.IsStream() {
+					fmt.Println("RequestType: stream " + rpc.RequestType.Name())
+				} else {
+					fmt.Println("RequestType: " + rpc.RequestType.Name())
+				}
+				if rpc.ResponseType.IsStream() {
+					fmt.Println("ResponseType: stream " + rpc.ResponseType.Name())
+				} else {
+					fmt.Println("ResponseType: " + rpc.ResponseType.Name())
+				}
 			}
 		}
 

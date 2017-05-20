@@ -128,7 +128,8 @@ func (mdt MapDataType) Name() string {
 
 // NamedDataType ...
 type NamedDataType struct {
-	name string
+	supportsStreaming bool
+	name              string
 }
 
 // Kind method from interface DataType
@@ -139,4 +140,14 @@ func (ndt NamedDataType) Kind() DataTypeKind {
 // Name method from interface DataType
 func (ndt NamedDataType) Name() string {
 	return ndt.name
+}
+
+// IsStream method from interface DataType
+func (ndt NamedDataType) IsStream() bool {
+	return ndt.supportsStreaming
+}
+
+// stream method from interface DataType
+func (ndt *NamedDataType) stream(flag bool) {
+	ndt.supportsStreaming = flag
 }

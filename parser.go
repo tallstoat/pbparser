@@ -623,16 +623,12 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 	}
 
 	// parse request type...
-	var requestType DataType
-	requestType, err = p.readDataType()
+	var requestType NamedDataType
+	requestType, err = p.readRequestResponseType()
 	if err != nil {
 		return err
 	}
-	if requestType.Kind() != NamedDataTypeKind {
-		msg := fmt.Sprintf("Expected named requestType, but found: %v", requestType.Kind())
-		return errors.New(msg)
-	}
-	rpc.RequestType = requestType.(NamedDataType)
+	rpc.RequestType = requestType
 	if c := p.read(); c != ')' {
 		msg := fmt.Sprintf("Expected ')', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
 		return errors.New(msg)
@@ -652,16 +648,12 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 	}
 
 	// parse response type...
-	var responseType DataType
-	responseType, err = p.readDataType()
+	var responseType NamedDataType
+	responseType, err = p.readRequestResponseType()
 	if err != nil {
 		return err
 	}
-	if responseType.Kind() != NamedDataTypeKind {
-		msg := fmt.Sprintf("Expected named responseType, but found: %v", responseType.Kind())
-		return errors.New(msg)
-	}
-	rpc.ResponseType = responseType.(NamedDataType)
+	rpc.ResponseType = responseType
 	if c := p.read(); c != ')' {
 		msg := fmt.Sprintf("Expected ')', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
 		return errors.New(msg)
@@ -777,6 +769,31 @@ func (p *parser) readQuotedString() (string, error) {
 		return "", errors.New(msg)
 	}
 	return str, nil
+}
+
+func (p *parser) readRequestResponseType() (NamedDataType, error) {
+	name := p.readWord()
+
+	// check for 'stream' keyword...
+	var requiresStreaming bool
+	if name == "stream" {
+		requiresStreaming = true
+		// get the actual data type
+		p.skipWhitespace()
+		name = p.readWord()
+	}
+	p.skipWhitespace()
+
+	dt, err := p.readDataTypeInternal(name)
+	switch t := dt.(type) {
+	case NamedDataType:
+		_ = t
+		ndt := dt.(NamedDataType)
+		ndt.stream(requiresStreaming)
+		return ndt, err
+	default:
+		return NamedDataType{}, errors.New("Expected message type")
+	}
 }
 
 func (p *parser) readDataType() (DataType, error) {
