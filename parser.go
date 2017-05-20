@@ -183,7 +183,15 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		if err := p.readRPC(pf, se, documentation); err != nil {
 			return err
 		}
-	} else if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx {
+	} else if label == "oneof" {
+		if !ctx.permitsOneOf() {
+			msg := fmt.Sprintf("Unexpected 'oneof' in context: %v", ctx.ctxType)
+			return errors.New(msg)
+		}
+		if err := p.readOneOf(pf, documentation, ctx); err != nil {
+			return err
+		}
+	} else if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx || ctx.ctxType == oneOfCtx {
 		if !ctx.permitsField() {
 			return errors.New("fields must be nested")
 		}
@@ -216,6 +224,11 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		return errors.New("Explicit 'optional' labels are disallowed in the Proto3 syntax. " +
 			"To define 'optional' fields in Proto3, simply remove the 'optional' label, as fields " +
 			"are 'optional' by default.")
+	}
+
+	if (label == "required" || label == "optional" || label == "repeated") && ctx.ctxType == oneOfCtx {
+		msg := fmt.Sprintf("Label '%v' is disallowd in oneoff field on line: %v", label, p.loc.line)
+		return errors.New(msg)
 	}
 
 	// the field struct...
@@ -277,8 +290,10 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	} else if ctx.ctxType == extendCtx {
 		ee := ctx.obj.(*ExtendElement)
 		ee.Fields = append(ee.Fields, fe)
+	} else if ctx.ctxType == oneOfCtx {
+		oe := ctx.obj.(*OneOfElement)
+		oe.Fields = append(oe.Fields, fe)
 	}
-
 	return nil
 }
 
@@ -330,7 +345,46 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 	}
 
 	pf.Messages = append(pf.Messages, me)
+	return nil
+}
 
+func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) error {
+	p.skipWhitespace()
+	name, err := p.readName()
+	if err != nil {
+		return err
+	}
+
+	oe := OneOfElement{Name: name, Documentation: documentation}
+
+	p.skipWhitespace()
+	if c := p.read(); c != '{' {
+		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	for {
+		nestedDocumentation, err := p.readDocumentationIfFound()
+		if err != nil {
+			return err
+		}
+		if eofReached {
+			break
+		}
+		if c := p.read(); c == '}' {
+			break
+		}
+		p.unread()
+
+		ctx := parseCtx{ctxType: oneOfCtx, obj: &oe}
+		err = p.readDeclaration(pf, nestedDocumentation, ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	me := ctx.obj.(*MessageElement)
+	me.OneOfs = append(me.OneOfs, oe)
 	return nil
 }
 
@@ -373,7 +427,6 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 	}
 
 	pf.ExtendDeclarations = append(pf.ExtendDeclarations, ee)
-
 	return nil
 }
 
@@ -415,7 +468,6 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 	}
 
 	pf.Services = append(pf.Services, se)
-
 	return nil
 }
 
@@ -511,7 +563,6 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 	}
 
 	se.RPCs = append(se.RPCs, rpc)
-
 	return nil
 }
 
@@ -554,7 +605,6 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 	}
 
 	pf.Enums = append(pf.Enums, ee)
-
 	return nil
 }
 

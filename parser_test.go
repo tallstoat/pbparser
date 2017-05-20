@@ -51,6 +51,21 @@ func TestParseFile(t *testing.T) {
 				fmt.Printf("Tag: %v\n", f.Tag)
 				fmt.Println("Doc: " + f.Documentation)
 			}
+			for _, oo := range m.OneOfs {
+				fmt.Println()
+				fmt.Println("OneOff: " + oo.Name)
+				fmt.Println("Doc: " + oo.Documentation)
+				for _, f := range oo.Fields {
+					fmt.Println()
+					fmt.Println("OneOff Field: " + f.Name)
+					if f.Label != "" {
+						fmt.Println("Label: " + f.Label)
+					}
+					fmt.Printf("Type: %v\n", f.Type)
+					fmt.Printf("Tag: %v\n", f.Tag)
+					fmt.Println("Doc: " + f.Documentation)
+				}
+			}
 		}
 
 		for _, ed := range pf.ExtendDeclarations {

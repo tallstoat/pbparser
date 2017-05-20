@@ -32,7 +32,11 @@ message Task {
   string remind = 8;
   string location = 9;
   repeated string tags = 10;  
-  repeated string comments = 11;  
+  repeated string comments = 11;
+  oneof fizzbuzz {
+    string fizz = 12;
+    int buzz = 13;
+  }  
 }
 
 extend Task {

@@ -15,6 +15,7 @@ type ctxType int
 const (
 	fileCtx ctxType = iota
 	msgCtx
+	oneOfCtx
 	enumCtx
 	rpcCtx
 	extendCtx
@@ -38,7 +39,7 @@ func (pc parseCtx) permitsImport() bool {
 
 // does this ctx permit field support?
 func (pc parseCtx) permitsField() bool {
-	return pc.ctxType == msgCtx || pc.ctxType == extendCtx
+	return pc.ctxType == msgCtx || pc.ctxType == oneOfCtx || pc.ctxType == extendCtx
 }
 
 // does this ctx permit extensions support?
