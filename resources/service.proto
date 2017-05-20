@@ -59,6 +59,7 @@ message TaskListOptions {
 message TaskUpdateOptions {
   TaskId taskId = 1;
   Task task = 2;
+  reserved 10, 12, 9 to 11;
 }
 
 // Return status of delete and update task operations...

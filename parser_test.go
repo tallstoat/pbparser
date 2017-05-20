@@ -76,6 +76,11 @@ func TestParseFile(t *testing.T) {
 				fmt.Println()
 				fmt.Printf("Reserved Name: " + rn)
 			}
+			for _, rr := range m.ReservedRanges {
+				fmt.Println()
+				fmt.Printf("Reserved Range: %v to %v\n", rr.Start, rr.End)
+				fmt.Println("Reserved Range Doc: " + rr.Documentation)
+			}
 		}
 
 		for _, ed := range pf.ExtendDeclarations {

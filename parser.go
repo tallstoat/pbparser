@@ -249,7 +249,48 @@ func (p *parser) readReserved(pf *ProtoFile, documentation string, ctx parseCtx)
 }
 
 func (p *parser) readReservedRanges(documentation string, me *MessageElement) error {
-	//TODO: implement this.
+	for {
+		start, err := p.readInt()
+		if err != nil {
+			return err
+		}
+
+		rr := ReservedRangeElement{Start: start, End: start, Documentation: documentation}
+
+		// check if we are done providing the reserved names
+		c := p.read()
+		if c == ';' {
+			me.ReservedRanges = append(me.ReservedRanges, rr)
+			break
+		} else if c == ',' {
+			me.ReservedRanges = append(me.ReservedRanges, rr)
+			p.skipWhitespace()
+		} else {
+			p.unread()
+			p.skipWhitespace()
+			if w := p.readWord(); w != "to" {
+				msg := fmt.Sprintf("Expected 'to', but found: %v on line: %v", w, p.loc.line)
+				return errors.New(msg)
+			}
+			p.skipWhitespace()
+			end, err := p.readInt()
+			if err != nil {
+				return err
+			}
+			rr.End = end
+			c2 := p.read()
+			if c2 == ';' {
+				me.ReservedRanges = append(me.ReservedRanges, rr)
+				break
+			} else if c2 == ',' {
+				me.ReservedRanges = append(me.ReservedRanges, rr)
+				p.skipWhitespace()
+			} else {
+				msg := fmt.Sprintf("Expected ',' or ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c2), p.loc.line, p.loc.column)
+				return errors.New(msg)
+			}
+		}
+	}
 	return nil
 }
 
