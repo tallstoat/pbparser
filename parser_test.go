@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	pbparser "github.com/tallstoat/pbparser"
+	"github.com/tallstoat/pbparser"
 )
 
 func TestParseFile(t *testing.T) {
@@ -65,6 +65,12 @@ func TestParseFile(t *testing.T) {
 					fmt.Printf("Tag: %v\n", f.Tag)
 					fmt.Println("Doc: " + f.Documentation)
 				}
+			}
+			for _, xe := range m.Extensions {
+				fmt.Println()
+				fmt.Printf("Extensions Start: %v\n", xe.Start)
+				fmt.Printf("Extensions End: %v\n", xe.End)
+				fmt.Println("Extensions Doc: " + xe.Documentation)
 			}
 		}
 

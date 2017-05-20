@@ -191,6 +191,14 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		if err := p.readOneOf(pf, documentation, ctx); err != nil {
 			return err
 		}
+	} else if label == "extensions" {
+		if !ctx.permitsExtensions() {
+			msg := fmt.Sprintf("Unexpected 'extensions' in context: %v", ctx.ctxType)
+			return errors.New(msg)
+		}
+		if err := p.readExtensions(pf, documentation, ctx); err != nil {
+			return err
+		}
 	} else if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx || ctx.ctxType == oneOfCtx {
 		if !ctx.permitsField() {
 			return errors.New("fields must be nested")
@@ -345,6 +353,43 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 	}
 
 	pf.Messages = append(pf.Messages, me)
+	return nil
+}
+
+func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCtx) error {
+	p.skipWhitespace()
+	start, err := p.readInt()
+	if err != nil {
+		return err
+	}
+
+	// At this point, make End be same as Start...
+	xe := ExtensionsElement{Documentation: documentation, Start: start, End: start}
+
+	c := p.read()
+	if c != ';' {
+		p.unread()
+		p.skipWhitespace()
+		if w := p.readWord(); w != "to" {
+			msg := fmt.Sprintf("Expected 'to', but found: %v on line: %v", w, p.loc.line)
+			return errors.New(msg)
+		}
+		p.skipWhitespace()
+		var end int
+		endStr := p.readWord()
+		if endStr == "max" {
+			end = 536870911
+		} else {
+			end, err = strconv.Atoi(endStr)
+			if err != nil {
+				return err
+			}
+		}
+		xe.End = end
+	}
+
+	me := ctx.obj.(*MessageElement)
+	me.Extensions = append(me.Extensions, xe)
 	return nil
 }
 

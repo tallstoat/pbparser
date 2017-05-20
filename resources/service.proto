@@ -52,6 +52,7 @@ message TaskList {
 message TaskListOptions {
   string status = 1;
   string for = 2;
+  extensions 1000 to max;
 }
 
 // Options to pass in for updating a task...
