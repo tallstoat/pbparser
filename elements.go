@@ -81,16 +81,25 @@ type ExtensionsElement struct {
 	End           int
 }
 
+// ReservedRangeElement ...
+type ReservedRangeElement struct {
+	Documentation string
+	Start         int
+	End           int
+}
+
 // MessageElement ...
 type MessageElement struct {
-	Name          string
-	QualifiedName string
-	Documentation string
-	Options       []OptionElement
-	Fields        []FieldElement
-	Enums         []EnumElement
-	OneOfs        []OneOfElement
-	Extensions    []ExtensionsElement
+	Name           string
+	QualifiedName  string
+	Documentation  string
+	Options        []OptionElement
+	Fields         []FieldElement
+	Enums          []EnumElement
+	OneOfs         []OneOfElement
+	Extensions     []ExtensionsElement
+	ReservedRanges []ReservedRangeElement
+	ReservedNames  []string
 }
 
 // ExtendElement ...
