@@ -65,6 +65,7 @@ message TaskUpdateOptions {
 message ReturnStatus {
   bool success = 1;
   string message = 2;
+  reserved "foo", "bar";
 }
 
 // EnumAllowingAlias docs for testing...

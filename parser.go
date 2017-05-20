@@ -199,6 +199,14 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		if err := p.readExtensions(pf, documentation, ctx); err != nil {
 			return err
 		}
+	} else if label == "reserved" {
+		if !ctx.permitsReserved() {
+			msg := fmt.Sprintf("Unexpected 'reserved' in context: %v", ctx.ctxType)
+			return errors.New(msg)
+		}
+		if err := p.readReserved(pf, documentation, ctx); err != nil {
+			return err
+		}
 	} else if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx || ctx.ctxType == oneOfCtx {
 		if !ctx.permitsField() {
 			return errors.New("fields must be nested")
@@ -224,6 +232,48 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		ee.EnumConstants = append(ee.EnumConstants, ec)
 	}
 
+	return nil
+}
+
+func (p *parser) readReserved(pf *ProtoFile, documentation string, ctx parseCtx) error {
+	p.skipWhitespace()
+	me := ctx.obj.(*MessageElement)
+	c := p.read()
+	p.unread()
+	if isDigit(c) {
+		p.readReservedRanges(documentation, me)
+	} else {
+		p.readReservedNames(documentation, me)
+	}
+	return nil
+}
+
+func (p *parser) readReservedRanges(documentation string, me *MessageElement) error {
+	//TODO: implement this.
+	return nil
+}
+
+func (p *parser) readReservedNames(documentation string, me *MessageElement) error {
+	for {
+		name, err := p.readQuotedString()
+		if err != nil {
+			return err
+		}
+		me.ReservedNames = append(me.ReservedNames, name)
+
+		// check if we are done providing the reserved names
+		c := p.read()
+		if c == ';' {
+			break
+		}
+
+		// if not, there should be more names provided after a comma...
+		if c != ',' {
+			msg := fmt.Sprintf("Expected ',', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+			return errors.New(msg)
+		}
+		p.skipWhitespace()
+	}
 	return nil
 }
 

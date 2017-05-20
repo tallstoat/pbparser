@@ -43,10 +43,13 @@ func (pc parseCtx) permitsField() bool {
 }
 
 // does this ctx permit extensions support?
-// TODO: confirm if extensions are valid only in a msg context
 func (pc parseCtx) permitsExtensions() bool {
 	return pc.ctxType == msgCtx
-	//return pc.ctxType != fileCtx
+}
+
+// does this ctx permit reserved keyword support?
+func (pc parseCtx) permitsReserved() bool {
+	return pc.ctxType == msgCtx
 }
 
 // does this ctx permit rpc support?

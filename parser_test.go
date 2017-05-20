@@ -72,6 +72,10 @@ func TestParseFile(t *testing.T) {
 				fmt.Printf("Extensions End: %v\n", xe.End)
 				fmt.Println("Extensions Doc: " + xe.Documentation)
 			}
+			for _, rn := range m.ReservedNames {
+				fmt.Println()
+				fmt.Printf("Reserved Name: " + rn)
+			}
 		}
 
 		for _, ed := range pf.ExtendDeclarations {
