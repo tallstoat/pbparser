@@ -2,7 +2,7 @@
 sfsf fafasf affaf fasfaf
 */
 syntax = "proto3";
-package logtask;
+package enumpkg;
 
 // EnumAllowingAlias docs for testing...
 enum EnumAllowingAlias {
