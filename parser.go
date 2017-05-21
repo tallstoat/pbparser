@@ -11,9 +11,6 @@ import (
 	"strings"
 )
 
-// The current package name + nested type names, separated by dots
-var prefix string
-
 // ParseFile This method is to be called with the path
 // of the proto file to be parsed.
 func ParseFile(filePath string) (ProtoFile, error) {
@@ -46,6 +43,10 @@ type location struct {
 type parser struct {
 	br  *bufio.Reader
 	loc *location
+	// We set this flag, when eof is encountered...
+	eofReached bool
+	// The current package name + nested type names, separated by dots
+	prefix string
 }
 
 // This method just looks for documentation and
@@ -55,20 +56,20 @@ func (p *parser) parser(pf *ProtoFile) {
 		// read any documentation if found...
 		documentation, err := p.readDocumentationIfFound()
 		finishIfNecessary(err)
-		if eofReached {
+		if p.eofReached {
 			break
 		}
 
 		// skip any intervening whitespace if present...
 		p.skipWhitespace()
-		if eofReached {
+		if p.eofReached {
 			break
 		}
 
 		// read any declaration...
 		err = p.readDeclaration(pf, documentation, parseCtx{ctxType: fileCtx})
 		finishIfNecessary(err)
-		if eofReached {
+		if p.eofReached {
 			break
 		}
 	}
@@ -78,7 +79,7 @@ func (p *parser) readDocumentationIfFound() (string, error) {
 	for {
 		c := p.read()
 		if c == eof {
-			eofReached = true
+			p.eofReached = true
 			break
 		} else if isWhitespace(c) {
 			// if leading whitespace, consume all contiguous whitespace till newline
@@ -116,7 +117,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 		p.skipWhitespace()
 		pf.PackageName = p.readWord()
-		prefix = pf.PackageName + "."
+		p.prefix = pf.PackageName + "."
 	} else if label == "syntax" {
 		if !ctx.permitsSyntax() {
 			msg := fmt.Sprintf("Unexpected 'syntax' in context: %v", ctx.ctxType)
@@ -403,18 +404,18 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 		return err
 	}
 
-	me := MessageElement{Name: name, QualifiedName: prefix + name, Documentation: documentation}
+	me := MessageElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
 
 	// store previous prefix...
 	var previousPrefix string
-	previousPrefix = prefix
+	previousPrefix = p.prefix
 
 	// update prefix...
-	prefix = prefix + name + "."
+	p.prefix = p.prefix + name + "."
 
 	// reset prefix when we are done processing all fields in the message...
 	defer func() {
-		prefix = previousPrefix
+		p.prefix = previousPrefix
 	}()
 
 	p.skipWhitespace()
@@ -428,7 +429,7 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 		if err != nil {
 			return err
 		}
-		if eofReached {
+		if p.eofReached {
 			break
 		}
 		if c := p.read(); c == '}' {
@@ -504,7 +505,7 @@ func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) er
 		if err != nil {
 			return err
 		}
-		if eofReached {
+		if p.eofReached {
 			break
 		}
 		if c := p.read(); c == '}' {
@@ -531,8 +532,8 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 		return err
 	}
 	qualifiedName := name
-	if !strings.Contains(name, ".") && prefix != "" {
-		qualifiedName = prefix + name
+	if !strings.Contains(name, ".") && p.prefix != "" {
+		qualifiedName = p.prefix + name
 	}
 	ee := ExtendElement{Name: name, QualifiedName: qualifiedName, Documentation: documentation}
 
@@ -547,7 +548,7 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 		if err != nil {
 			return err
 		}
-		if eofReached {
+		if p.eofReached {
 			break
 		}
 		if c := p.read(); c == '}' {
@@ -578,7 +579,7 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 		return errors.New(msg)
 	}
 
-	se := ServiceElement{Name: name, QualifiedName: prefix + name}
+	se := ServiceElement{Name: name, QualifiedName: p.prefix + name}
 	if documentation != "" {
 		se.Documentation = documentation
 	}
@@ -588,7 +589,7 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 		if err != nil {
 			return err
 		}
-		if eofReached {
+		if p.eofReached {
 			break
 		}
 		if c := p.read(); c == '}' {
@@ -669,7 +670,7 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 			}
 			p.unread()
 
-			if eofReached {
+			if p.eofReached {
 				break
 			}
 
@@ -700,7 +701,7 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 	if err != nil {
 		return err
 	}
-	ee := EnumElement{Name: name, QualifiedName: prefix + name}
+	ee := EnumElement{Name: name, QualifiedName: p.prefix + name}
 	if documentation != "" {
 		ee.Documentation = documentation
 	}
@@ -717,7 +718,7 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 		if err != nil {
 			return err
 		}
-		if eofReached {
+		if p.eofReached {
 			break
 		}
 		if c := p.read(); c == '}' {
@@ -938,7 +939,7 @@ func (p *parser) readUntilNewline() string {
 			break
 		}
 		if c == eof {
-			eofReached = true
+			p.eofReached = true
 			break
 		}
 		buf.WriteRune(c)
@@ -954,7 +955,7 @@ func (p *parser) skipUntilNewline() {
 			return
 		}
 		if c == eof {
-			eofReached = true
+			p.eofReached = true
 			return
 		}
 	}
@@ -983,7 +984,7 @@ func (p *parser) skipWhitespace() {
 	for {
 		c := p.read()
 		if c == eof {
-			eofReached = true
+			p.eofReached = true
 			break
 		} else if !isWhitespace(c) {
 			p.unread()
@@ -1021,6 +1022,3 @@ func isDigit(c rune) bool {
 
 // End of the file...
 var eof = rune(0)
-
-// We set this flag, when eof is encountered...
-var eofReached bool
