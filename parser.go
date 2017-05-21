@@ -131,31 +131,8 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 			msg := fmt.Sprintf("Unexpected 'import' in context: %v", ctx.ctxType)
 			return errors.New(msg)
 		}
-		p.skipWhitespace()
-		c := p.read()
-		p.unread()
-		if c == '"' {
-			importString, err := p.readQuotedString()
-			if err != nil {
-				return err
-			}
-			pf.Dependencies = append(pf.Dependencies, importString)
-		} else {
-			publicStr := p.readWord()
-			if "public" != publicStr {
-				msg := fmt.Sprintf("Expected 'public', but found: %v on line: %v", publicStr, p.loc.line)
-				return errors.New(msg)
-			}
-			p.skipWhitespace()
-			importString, err := p.readQuotedString()
-			if err != nil {
-				return err
-			}
-			pf.PublicDependencies = append(pf.PublicDependencies, importString)
-		}
-		if c := p.read(); c != ';' {
-			msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-			return errors.New(msg)
+		if err := p.readImport(pf); err != nil {
+			return err
 		}
 	} else if label == "option" {
 		//TODO: implement this later
@@ -734,6 +711,36 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 	}
 
 	pf.Enums = append(pf.Enums, ee)
+	return nil
+}
+
+func (p *parser) readImport(pf *ProtoFile) error {
+	p.skipWhitespace()
+	c := p.read()
+	p.unread()
+	if c == '"' {
+		importString, err := p.readQuotedString()
+		if err != nil {
+			return err
+		}
+		pf.Dependencies = append(pf.Dependencies, importString)
+	} else {
+		publicStr := p.readWord()
+		if "public" != publicStr {
+			msg := fmt.Sprintf("Expected 'public', but found: %v on line: %v", publicStr, p.loc.line)
+			return errors.New(msg)
+		}
+		p.skipWhitespace()
+		importString, err := p.readQuotedString()
+		if err != nil {
+			return err
+		}
+		pf.PublicDependencies = append(pf.PublicDependencies, importString)
+	}
+	if c := p.read(); c != ';' {
+		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
 	return nil
 }
 
