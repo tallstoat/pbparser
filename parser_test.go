@@ -7,6 +7,10 @@ import (
 	"github.com/tallstoat/pbparser"
 )
 
+// init the tabs...
+var tab = indent(2)
+var tab2 = indent(4)
+
 func TestParseFile(t *testing.T) {
 	var tests = []struct {
 		file string
@@ -18,9 +22,6 @@ func TestParseFile(t *testing.T) {
 	for i, tt := range tests {
 		fmt.Printf("Running test: %v \n\n", i)
 		fmt.Printf("Parsing file: %v \n", tt.file)
-
-		tab := indent(2)
-		tab2 := indent(4)
 
 		pf, err := pbparser.ParseFile(tt.file)
 		if err != nil {
@@ -38,28 +39,7 @@ func TestParseFile(t *testing.T) {
 		options(pf.Options, "")
 
 		for _, m := range pf.Messages {
-			fmt.Println("Message: " + m.Name)
-			fmt.Println("QualifiedName: " + m.QualifiedName)
-			doc(m.Documentation)
-			options(m.Options, "")
-			fields(m.Fields, tab)
-			for _, oo := range m.OneOfs {
-				fmt.Println(tab + "OneOff: " + oo.Name)
-				doc(oo.Documentation)
-				options(oo.Options, tab)
-				fields(oo.Fields, tab2)
-			}
-			for _, xe := range m.Extensions {
-				fmt.Printf("%vExtensions:: Start: %v End: %v\n", tab, xe.Start, xe.End)
-				doc(xe.Documentation)
-			}
-			for _, rn := range m.ReservedNames {
-				fmt.Println(tab + "Reserved Name: " + rn)
-			}
-			for _, rr := range m.ReservedRanges {
-				fmt.Printf("%vReserved Range:: Start: %v to End: %v\n", tab, rr.Start, rr.End)
-				doc(rr.Documentation)
-			}
+			printMessage(&m)
 		}
 
 		for _, ed := range pf.ExtendDeclarations {
@@ -75,36 +55,69 @@ func TestParseFile(t *testing.T) {
 			doc(s.Documentation)
 			options(s.Options, "")
 			for _, rpc := range s.RPCs {
-				fmt.Println(tab + "RPC: " + rpc.Name)
-				doc(rpc.Documentation)
-				if rpc.RequestType.IsStream() {
-					fmt.Println(tab + "RequestType: stream " + rpc.RequestType.Name())
-				} else {
-					fmt.Println(tab + "RequestType: " + rpc.RequestType.Name())
-				}
-				if rpc.ResponseType.IsStream() {
-					fmt.Println(tab + "ResponseType: stream " + rpc.ResponseType.Name())
-				} else {
-					fmt.Println(tab + "ResponseType: " + rpc.ResponseType.Name())
-				}
-				options(rpc.Options, tab)
+				printRPC(&rpc)
 			}
 		}
 
 		for _, en := range pf.Enums {
-			fmt.Println("Enum: " + en.Name)
-			fmt.Println("QualifiedName: " + en.QualifiedName)
-			doc(en.Documentation)
-			options(en.Options, "")
-			for _, enc := range en.EnumConstants {
-				fmt.Printf("%vName: %v Tag: %v\n", tab, enc.Name, enc.Tag)
-				options(enc.Options, tab2)
-			}
+			printEnum(&en)
 		}
 		fmt.Printf("\nFinished test: %v \n\n", i)
 	}
 
 	fmt.Println("done")
+}
+
+func printMessage(m *pbparser.MessageElement) {
+	fmt.Println("Message: " + m.Name)
+	fmt.Println("QualifiedName: " + m.QualifiedName)
+	doc(m.Documentation)
+	options(m.Options, "")
+	fields(m.Fields, tab)
+	for _, oo := range m.OneOfs {
+		fmt.Println(tab + "OneOff: " + oo.Name)
+		doc(oo.Documentation)
+		options(oo.Options, tab)
+		fields(oo.Fields, tab2)
+	}
+	for _, xe := range m.Extensions {
+		fmt.Printf("%vExtensions:: Start: %v End: %v\n", tab, xe.Start, xe.End)
+		doc(xe.Documentation)
+	}
+	for _, rn := range m.ReservedNames {
+		fmt.Println(tab + "Reserved Name: " + rn)
+	}
+	for _, rr := range m.ReservedRanges {
+		fmt.Printf("%vReserved Range:: Start: %v to End: %v\n", tab, rr.Start, rr.End)
+		doc(rr.Documentation)
+	}
+}
+
+func printRPC(rpc *pbparser.RPCElement) {
+	fmt.Println(tab + "RPC: " + rpc.Name)
+	doc(rpc.Documentation)
+	if rpc.RequestType.IsStream() {
+		fmt.Println(tab + "RequestType: stream " + rpc.RequestType.Name())
+	} else {
+		fmt.Println(tab + "RequestType: " + rpc.RequestType.Name())
+	}
+	if rpc.ResponseType.IsStream() {
+		fmt.Println(tab + "ResponseType: stream " + rpc.ResponseType.Name())
+	} else {
+		fmt.Println(tab + "ResponseType: " + rpc.ResponseType.Name())
+	}
+	options(rpc.Options, tab)
+}
+
+func printEnum(en *pbparser.EnumElement) {
+	fmt.Println("Enum: " + en.Name)
+	fmt.Println("QualifiedName: " + en.QualifiedName)
+	doc(en.Documentation)
+	options(en.Options, "")
+	for _, enc := range en.EnumConstants {
+		fmt.Printf("%vName: %v Tag: %v\n", tab, enc.Name, enc.Tag)
+		options(enc.Options, tab2)
+	}
 }
 
 func options(options []pbparser.OptionElement, tab string) {
