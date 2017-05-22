@@ -35,6 +35,7 @@ func TestParseFile(t *testing.T) {
 		for _, d := range pf.PublicDependencies {
 			fmt.Println("PublicDependency: " + d)
 		}
+		options(pf.Options, "")
 
 		for _, m := range pf.Messages {
 			fmt.Println("Message: " + m.Name)

@@ -4,6 +4,8 @@ sfsf fafasf affaf fasfaf
 syntax = "proto3";
 package logtask;
 
+option java_package = "com.google.protobuf";
+
 import public "new.proto";
 import "other.proto";
 

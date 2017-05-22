@@ -455,8 +455,9 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 	} else if ctx.ctxType == rpcCtx {
 		re := ctx.obj.(*RPCElement)
 		re.Options = append(re.Options, oe)
+	} else if ctx.ctxType == fileCtx {
+		pf.Options = append(pf.Options, oe)
 	}
-
 	return nil
 }
 
