@@ -52,6 +52,11 @@ func TestParseFile(t *testing.T) {
 				if f.Documentation != "" {
 					fmt.Println(tab + "Doc: " + f.Documentation)
 				}
+				if len(f.Options) > 0 {
+					for _, op := range f.Options {
+						fmt.Printf("%vOption %v = %v\n", tab2, op.Name, op.Value)
+					}
+				}
 			}
 			for _, oo := range m.OneOfs {
 				fmt.Println(tab + "OneOff: " + oo.Name)

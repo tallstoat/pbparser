@@ -26,12 +26,12 @@ message Task {
   string name = 1;
   string id = 2;
   string desc = 3;
-  string priority = 4;
+  string priority = 4 [deprecated=true,default="p1"];
   string for = 5;
   string on = 6;
   string starting = 7;
-  string remind = 8;
-  string location = 9;
+  string remind = 8 [deprecated=true];
+  string location = 9 [default="mars"];
   repeated string tags = 10;  
   repeated string comments = 11;
   oneof fizzbuzz {

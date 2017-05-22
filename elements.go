@@ -1,24 +1,9 @@
 package pbparser
 
-// OptionKind the kinds of options which are supported
-type OptionKind int
-
-// OptionKind the kinds of options which are supported
-const (
-	StringOption OptionKind = iota
-	BoolOption
-	NumberOption
-	EnumOption
-	MapOption
-	ListOption
-	OptionOption
-)
-
 // OptionElement ...
 type OptionElement struct {
 	Name            string
 	Value           string
-	Kind            OptionKind
 	IsParenthesized bool
 }
 
@@ -72,6 +57,7 @@ type OneOfElement struct {
 	Name          string
 	Documentation string
 	Fields        []FieldElement
+	Options       []OptionElement
 }
 
 // ExtensionsElement ...

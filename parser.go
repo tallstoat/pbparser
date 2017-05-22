@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -353,9 +354,22 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	}
 	fe.Tag = tag
 
-	// read the semicolon
 	p.skipWhitespace()
-	if c := p.read(); c != ';' {
+
+	// If semicolon is next; we are done. If '[' is next, we must parse options for the field
+	c := p.read()
+	if c == '[' {
+		foptions, err := p.readFieldOptions()
+		if err != nil {
+			return err
+		}
+		fe.Options = foptions
+		c2 := p.read()
+		if c2 != ';' {
+			msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c2), p.loc.line, p.loc.column)
+			return errors.New(msg)
+		}
+	} else if c != ';' {
 		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
 		return errors.New(msg)
 	}
@@ -372,6 +386,24 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		oe.Fields = append(oe.Fields, fe)
 	}
 	return nil
+}
+
+func (p *parser) readFieldOptions() ([]OptionElement, error) {
+	var options []OptionElement
+	optionsStr := p.readUntil(']')
+	pairs := strings.Split(optionsStr, ",")
+	for _, pair := range pairs {
+		arr := strings.Split(pair, "=")
+		if len(arr) != 2 {
+			msg := fmt.Sprintf("Field option '%v' is not specified properly on line: %v", arr, p.loc.line)
+			return nil, errors.New(msg)
+		}
+		oname, hasParenthesis := stripParenthesis(arr[0])
+		oval := stripQuotes(arr[1])
+		oe := OptionElement{Name: oname, Value: oval, IsParenthesized: hasParenthesis}
+		options = append(options, oe)
+	}
+	return options, nil
 }
 
 func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
@@ -938,6 +970,22 @@ func (p *parser) readSingleLineComment() string {
 	return strings.TrimSpace(str)
 }
 
+func (p *parser) readUntil(terminator rune) string {
+	var buf bytes.Buffer
+	for {
+		c := p.read()
+		if c == terminator {
+			break
+		}
+		if c == eof {
+			p.eofReached = true
+			break
+		}
+		buf.WriteRune(c)
+	}
+	return buf.String()
+}
+
 func (p *parser) readUntilNewline() string {
 	var buf bytes.Buffer
 	for {
@@ -1000,6 +1048,20 @@ func (p *parser) skipWhitespace() {
 	}
 }
 
+func stripParenthesis(s string) (string, bool) {
+	if s[0] == '(' && s[len(s)-1] == ')' {
+		return parenthesisRemovalRegex.ReplaceAllString(s, "${1}"), true
+	}
+	return s, false
+}
+
+func stripQuotes(s string) string {
+	if s[0] == '"' && s[len(s)-1] == '"' {
+		return quoteRemovalRegex.ReplaceAllString(s, "${1}")
+	}
+	return s
+}
+
 func finishIfNecessary(err error) {
 	if err != nil {
 		fmt.Printf("Error: " + err.Error() + "\n")
@@ -1029,3 +1091,9 @@ func isDigit(c rune) bool {
 
 // End of the file...
 var eof = rune(0)
+
+// Regex for removing bounding quotes
+var quoteRemovalRegex = regexp.MustCompile(`"([^"]*)"`)
+
+// Regex for removing bounding parenthesis
+var parenthesisRemovalRegex = regexp.MustCompile(`\(([^"]*)\)`)
