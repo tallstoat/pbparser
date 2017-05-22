@@ -136,7 +136,13 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 			return err
 		}
 	} else if label == "option" {
-		//TODO: implement this later
+		if !ctx.permitsOption() {
+			msg := fmt.Sprintf("Unexpected 'option' in context: %v", ctx.ctxType)
+			return errors.New(msg)
+		}
+		if err := p.readOption(pf, documentation, ctx); err != nil {
+			return err
+		}
 	} else if label == "message" {
 		if err := p.readMessage(pf, documentation); err != nil {
 			return err
@@ -333,7 +339,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 
 	// figure out the name
 	p.skipWhitespace()
-	name, err := p.readName()
+	name, _, err := p.readName()
 	if err != nil {
 		return err
 	}
@@ -398,17 +404,74 @@ func (p *parser) readFieldOptions() ([]OptionElement, error) {
 			msg := fmt.Sprintf("Field option '%v' is not specified properly on line: %v", arr, p.loc.line)
 			return nil, errors.New(msg)
 		}
-		oname, hasParenthesis := stripParenthesis(arr[0])
-		oval := stripQuotes(arr[1])
+		oname, hasParenthesis := stripParenthesis(strings.TrimSpace(arr[0]))
+		oval := stripQuotes(strings.TrimSpace(arr[1]))
 		oe := OptionElement{Name: oname, Value: oval, IsParenthesized: hasParenthesis}
 		options = append(options, oe)
 	}
 	return options, nil
 }
 
+func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) error {
+	p.skipWhitespace()
+	oname, enc, err := p.readName()
+	if err != nil {
+		return err
+	}
+
+	hasParenthesis := false
+	if enc == parenthesis {
+		hasParenthesis = true
+	}
+
+	p.skipWhitespace()
+	if c := p.read(); c != '=' {
+		msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+	p.skipWhitespace()
+
+	var oval string
+	c := p.read()
+	p.unread()
+	if c == '"' {
+		oval, err = p.readQuotedString()
+		if err != nil {
+			return err
+		}
+	} else {
+		oval = p.readWord()
+	}
+
+	p.skipWhitespace()
+	if c := p.read(); c != ';' {
+		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	oe := OptionElement{Name: oname, Value: oval, IsParenthesized: hasParenthesis}
+
+	// add option to the proper parent...
+	if ctx.ctxType == msgCtx {
+		me := ctx.obj.(*MessageElement)
+		me.Options = append(me.Options, oe)
+	} else if ctx.ctxType == oneOfCtx {
+		ooe := ctx.obj.(*OneOfElement)
+		ooe.Options = append(ooe.Options, oe)
+	} else if ctx.ctxType == enumCtx {
+		ee := ctx.obj.(*EnumElement)
+		ee.Options = append(ee.Options, oe)
+	} else if ctx.ctxType == serviceCtx {
+		se := ctx.obj.(*ServiceElement)
+		se.Options = append(se.Options, oe)
+	}
+
+	return nil
+}
+
 func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 	p.skipWhitespace()
-	name, err := p.readName()
+	name, _, err := p.readName()
 	if err != nil {
 		return err
 	}
@@ -496,7 +559,7 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 
 func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
-	name, err := p.readName()
+	name, _, err := p.readName()
 	if err != nil {
 		return err
 	}
@@ -536,7 +599,7 @@ func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) er
 
 func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 	p.skipWhitespace()
-	name, err := p.readName()
+	name, _, err := p.readName()
 	if err != nil {
 		return err
 	}
@@ -578,7 +641,7 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 
 func (p *parser) readService(pf *ProtoFile, documentation string) error {
 	p.skipWhitespace()
-	name, err := p.readName()
+	name, _, err := p.readName()
 	if err != nil {
 		return err
 	}
@@ -619,7 +682,7 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 
 func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string) error {
 	p.skipWhitespace()
-	name, err := p.readName()
+	name, _, err := p.readName()
 	if err != nil {
 		return err
 	}
@@ -706,7 +769,7 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 
 func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 	p.skipWhitespace()
-	name, err := p.readName()
+	name, _, err := p.readName()
 	if err != nil {
 		return err
 	}
@@ -880,28 +943,31 @@ func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 	return NamedDataType{name: name}, nil
 }
 
-func (p *parser) readName() (string, error) {
+func (p *parser) readName() (string, enclosure, error) {
 	var name string
+	enc := unenclosed
 	c := p.read()
 	if c == '(' {
+		enc = parenthesis
 		name = p.readWord()
 		if p.read() != ')' {
 			msg := fmt.Sprintf("Expected ')' on line: %v, column: %v", p.loc.line, p.loc.column)
-			return "", errors.New(msg)
+			return "", enc, errors.New(msg)
 		}
 		p.unread()
 	} else if c == '[' {
+		enc = bracket
 		name = p.readWord()
 		if p.read() != ']' {
 			msg := fmt.Sprintf("Expected ']' on line: %v, column: %v", p.loc.line, p.loc.column)
-			return "", errors.New(msg)
+			return "", enc, errors.New(msg)
 		}
 		p.unread()
 	} else {
 		p.unread()
 		name = p.readWord()
 	}
-	return name, nil
+	return name, enc, nil
 }
 
 func (p *parser) readWord() string {
@@ -1097,3 +1163,13 @@ var quoteRemovalRegex = regexp.MustCompile(`"([^"]*)"`)
 
 // Regex for removing bounding parenthesis
 var parenthesisRemovalRegex = regexp.MustCompile(`\(([^"]*)\)`)
+
+// enclousure used to bound/enclose a string
+type enclosure int
+
+// enclosure the type of enclosures
+const (
+	parenthesis enclosure = iota
+	bracket
+	unenclosed
+)

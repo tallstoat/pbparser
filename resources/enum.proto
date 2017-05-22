@@ -6,6 +6,7 @@ package enumpkg;
 
 // EnumAllowingAlias docs for testing...
 enum EnumAllowingAlias {
+  option rah = true;
   UNKNOWN = 0;
   STARTED = 1;
   RUNNING = 2;
