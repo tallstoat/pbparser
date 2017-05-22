@@ -44,7 +44,7 @@ func (pc parseCtx) permitsField() bool {
 
 // does this ctx permit option?
 func (pc parseCtx) permitsOption() bool {
-	return pc.ctxType == msgCtx || pc.ctxType == oneOfCtx || pc.ctxType == enumCtx || pc.ctxType == serviceCtx
+	return pc.ctxType == msgCtx || pc.ctxType == oneOfCtx || pc.ctxType == enumCtx || pc.ctxType == serviceCtx || pc.ctxType == rpcCtx
 }
 
 // does this ctx permit extensions support?

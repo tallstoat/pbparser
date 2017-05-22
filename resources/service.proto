@@ -13,7 +13,9 @@ service LogTask {
   rpc AddTask (Task) returns (TaskId) {}
   rpc ListTasks(TaskListOptions) returns (TaskList) {}
   rpc UpdateTask(TaskUpdateOptions) returns (ReturnStatus) {}
-  rpc DeleteTask(TaskId) returns (ReturnStatus) {}
+  rpc DeleteTask(TaskId) returns (ReturnStatus) { 
+      option crap = true;
+  }
   rpc RouteChat(stream RouteNote) returns (stream RouteNote) {}
 }
 
