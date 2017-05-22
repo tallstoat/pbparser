@@ -8,6 +8,6 @@ package enumpkg;
 enum EnumAllowingAlias {
   option rah = true;
   UNKNOWN = 0;
-  STARTED = 1;
+  STARTED = 1 [option gah = 3];
   RUNNING = 2;
 }

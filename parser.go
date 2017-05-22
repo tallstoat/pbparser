@@ -200,21 +200,9 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 			return err
 		}
 	} else if ctx.ctxType == enumCtx {
-		p.skipWhitespace()
-		if c := p.read(); c != '=' {
-			msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-			return errors.New(msg)
-		}
-		p.skipWhitespace()
-
-		tag, err := p.readInt()
-		if err != nil {
+		if err := p.readEnumConstant(pf, label, documentation, ctx); err != nil {
 			return err
 		}
-
-		ee := ctx.obj.(*EnumElement)
-		ec := EnumConstantElement{Name: label, Tag: tag, Documentation: documentation}
-		ee.EnumConstants = append(ee.EnumConstants, ec)
 	}
 
 	return nil
@@ -365,7 +353,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	// If semicolon is next; we are done. If '[' is next, we must parse options for the field
 	c := p.read()
 	if c == '[' {
-		foptions, err := p.readFieldOptions()
+		foptions, err := p.readListOptions()
 		if err != nil {
 			return err
 		}
@@ -394,14 +382,14 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	return nil
 }
 
-func (p *parser) readFieldOptions() ([]OptionElement, error) {
+func (p *parser) readListOptions() ([]OptionElement, error) {
 	var options []OptionElement
 	optionsStr := p.readUntil(']')
 	pairs := strings.Split(optionsStr, ",")
 	for _, pair := range pairs {
 		arr := strings.Split(pair, "=")
 		if len(arr) != 2 {
-			msg := fmt.Sprintf("Field option '%v' is not specified properly on line: %v", arr, p.loc.line)
+			msg := fmt.Sprintf("Option '%v' is not specified as expected on line: %v", arr, p.loc.line)
 			return nil, errors.New(msg)
 		}
 		oname, hasParenthesis := stripParenthesis(strings.TrimSpace(arr[0]))
@@ -557,6 +545,44 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 
 	me := ctx.obj.(*MessageElement)
 	me.Extensions = append(me.Extensions, xe)
+	return nil
+}
+
+func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
+	p.skipWhitespace()
+	if c := p.read(); c != '=' {
+		msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+	p.skipWhitespace()
+
+	tag, err := p.readInt()
+	if err != nil {
+		return err
+	}
+
+	ec := EnumConstantElement{Name: label, Tag: tag, Documentation: documentation}
+
+	p.skipWhitespace()
+	c := p.read()
+	if c == '[' {
+		ecOptions, err := p.readListOptions()
+		if err != nil {
+			return err
+		}
+		ec.Options = ecOptions
+		c2 := p.read()
+		if c2 != ';' {
+			msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c2), p.loc.line, p.loc.column)
+			return errors.New(msg)
+		}
+	} else if c != ';' {
+		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
+		return errors.New(msg)
+	}
+
+	ee := ctx.obj.(*EnumElement)
+	ee.EnumConstants = append(ee.EnumConstants, ec)
 	return nil
 }
 

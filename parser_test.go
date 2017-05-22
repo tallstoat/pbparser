@@ -97,6 +97,7 @@ func TestParseFile(t *testing.T) {
 			options(en.Options, "")
 			for _, enc := range en.EnumConstants {
 				fmt.Printf("%vName: %v Tag: %v\n", tab, enc.Name, enc.Tag)
+				options(enc.Options, tab2)
 			}
 		}
 		fmt.Printf("\nFinished test: %v \n\n", i)
