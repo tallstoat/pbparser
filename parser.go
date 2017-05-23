@@ -368,7 +368,11 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		return errors.New(msg)
 	}
 
-	// add field to the proper parent...
+	// Gobble up any inline documentation for a field
+	// TODO: maybe store this as field.Documentation?
+	p.skipUntilNewline()
+
+	// add field to the proper parent	...
 	if ctx.ctxType == msgCtx {
 		me := ctx.obj.(*MessageElement)
 		me.Fields = append(me.Fields, fe)
@@ -421,13 +425,10 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 
 	var oval string
 	c := p.read()
-	p.unread()
 	if c == '"' {
-		oval, err = p.readQuotedString()
-		if err != nil {
-			return err
-		}
+		oval = p.readUntil('"')
 	} else {
+		p.unread()
 		oval = p.readWord()
 	}
 
@@ -493,6 +494,7 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 		if err != nil {
 			return err
 		}
+		p.skipWhitespace()
 		if p.eofReached {
 			break
 		}
@@ -607,6 +609,7 @@ func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) er
 		if err != nil {
 			return err
 		}
+		p.skipWhitespace()
 		if p.eofReached {
 			break
 		}
@@ -650,6 +653,7 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 		if err != nil {
 			return err
 		}
+		p.skipWhitespace()
 		if p.eofReached {
 			break
 		}
@@ -691,6 +695,7 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 		if err != nil {
 			return err
 		}
+		p.skipWhitespace()
 		if p.eofReached {
 			break
 		}
@@ -776,14 +781,15 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 				break
 			}
 
-			rpcDocumentation, err := p.readDocumentationIfFound()
+			withinRPCBracketsDocumentation, err := p.readDocumentationIfFound()
 			if err != nil {
 				return err
 			}
+			p.skipWhitespace()
 
 			//parse for options...
 			ctx := parseCtx{ctxType: rpcCtx, obj: &rpc}
-			err = p.readDeclaration(pf, rpcDocumentation, ctx)
+			err = p.readDeclaration(pf, withinRPCBracketsDocumentation, ctx)
 			if err != nil {
 				return err
 			}
@@ -820,6 +826,7 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 		if err != nil {
 			return err
 		}
+		p.skipWhitespace()
 		if p.eofReached {
 			break
 		}
@@ -1061,9 +1068,22 @@ func (p *parser) readMultiLineComment() string {
 	return strings.TrimSpace(str)
 }
 
+// Reads one or multiple single line comments
 func (p *parser) readSingleLineComment() string {
-	str := p.readUntilNewline()
-	return strings.TrimSpace(str)
+	str := strings.TrimSpace(p.readUntilNewline())
+	for {
+		p.skipWhitespace()
+		if c := p.read(); c != '/' {
+			p.unread()
+			break
+		}
+		if c := p.read(); c != '/' {
+			p.unread()
+			break
+		}
+		str += " " + strings.TrimSpace(p.readUntilNewline())
+	}
+	return str
 }
 
 func (p *parser) readUntil(terminator rune) string {
