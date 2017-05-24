@@ -17,6 +17,7 @@ func TestParseFile(t *testing.T) {
 	}{
 		{file: "./resources/enum.proto"},
 		{file: "./resources/service.proto"},
+		{file: "./resources/descriptor.proto"},
 	}
 
 	for i, tt := range tests {
@@ -45,14 +46,14 @@ func TestParseFile(t *testing.T) {
 		for _, ed := range pf.ExtendDeclarations {
 			fmt.Println("Extend: " + ed.Name)
 			fmt.Println("QualifiedName: " + ed.QualifiedName)
-			doc(ed.Documentation)
+			doc(ed.Documentation, "")
 			fields(ed.Fields, tab)
 		}
 
 		for _, s := range pf.Services {
 			fmt.Println("Service: " + s.Name)
 			fmt.Println("QualifiedName: " + s.QualifiedName)
-			doc(s.Documentation)
+			doc(s.Documentation, "")
 			options(s.Options, "")
 			for _, rpc := range s.RPCs {
 				printRPC(&rpc)
@@ -71,31 +72,31 @@ func TestParseFile(t *testing.T) {
 func printMessage(m *pbparser.MessageElement) {
 	fmt.Println("Message: " + m.Name)
 	fmt.Println("QualifiedName: " + m.QualifiedName)
-	doc(m.Documentation)
+	doc(m.Documentation, "")
 	options(m.Options, "")
 	fields(m.Fields, tab)
 	for _, oo := range m.OneOfs {
 		fmt.Println(tab + "OneOff: " + oo.Name)
-		doc(oo.Documentation)
+		doc(oo.Documentation, tab)
 		options(oo.Options, tab)
 		fields(oo.Fields, tab2)
 	}
 	for _, xe := range m.Extensions {
 		fmt.Printf("%vExtensions:: Start: %v End: %v\n", tab, xe.Start, xe.End)
-		doc(xe.Documentation)
+		doc(xe.Documentation, tab)
 	}
 	for _, rn := range m.ReservedNames {
 		fmt.Println(tab + "Reserved Name: " + rn)
 	}
 	for _, rr := range m.ReservedRanges {
 		fmt.Printf("%vReserved Range:: Start: %v to End: %v\n", tab, rr.Start, rr.End)
-		doc(rr.Documentation)
+		doc(rr.Documentation, tab)
 	}
 }
 
 func printRPC(rpc *pbparser.RPCElement) {
 	fmt.Println(tab + "RPC: " + rpc.Name)
-	doc(rpc.Documentation)
+	doc(rpc.Documentation, tab)
 	if rpc.RequestType.IsStream() {
 		fmt.Println(tab + "RequestType: stream " + rpc.RequestType.Name())
 	} else {
@@ -112,10 +113,11 @@ func printRPC(rpc *pbparser.RPCElement) {
 func printEnum(en *pbparser.EnumElement) {
 	fmt.Println("Enum: " + en.Name)
 	fmt.Println("QualifiedName: " + en.QualifiedName)
-	doc(en.Documentation)
+	doc(en.Documentation, "")
 	options(en.Options, "")
 	for _, enc := range en.EnumConstants {
 		fmt.Printf("%vName: %v Tag: %v\n", tab, enc.Name, enc.Tag)
+		doc(enc.Documentation, tab)
 		options(enc.Options, tab2)
 	}
 }
@@ -138,14 +140,14 @@ func fields(fields []pbparser.FieldElement, tab string) {
 		}
 		fmt.Printf("%vType: %v\n", tab, f.Type)
 		fmt.Printf("%vTag: %v\n", tab, f.Tag)
-		doc(f.Documentation)
+		doc(f.Documentation, tab)
 		options(f.Options, tab+tab)
 	}
 }
 
-func doc(s string) {
+func doc(s string, tab string) {
 	if s != "" {
-		fmt.Println("Doc: " + s)
+		fmt.Println(tab + "Doc: " + s)
 	}
 }
 

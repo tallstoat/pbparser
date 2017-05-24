@@ -11,7 +11,9 @@ import "other.proto";
 
 // LogTask is a service which handles operations on tasks defined via a custom DSL
 service LogTask {
+  // meh doc
   option meh = true;
+  // AddTask doc
   rpc AddTask (Task) returns (TaskId) {}
   rpc ListTasks(TaskListOptions) returns (TaskList) {}
   rpc UpdateTask(TaskUpdateOptions) returns (ReturnStatus) {}
@@ -40,6 +42,7 @@ message Task {
   string location = 9 [default="mars"];
   repeated string tags = 10;  
   repeated string comments = 11;
+  // fizzed
   oneof fizzbuzz {
     option duh = true;
     string fizz = 12;
@@ -75,6 +78,15 @@ message ReturnStatus {
   bool success = 1;
   string message = 2;
   reserved "foo", "bar";
+}
+
+message SearchResponse {
+  message Result {
+    required string url = 1;
+    string title = 2;
+    repeated string snippets = 3;
+  }
+  repeated Result result = 1;
 }
 
 // EnumAllowingAlias docs for testing...

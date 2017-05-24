@@ -8,6 +8,7 @@ package enumpkg;
 enum EnumAllowingAlias {
   option rah = true;
   UNKNOWN = 0;
+  // da dada dum
   STARTED = 1 [option gah = 3];
   RUNNING = 2;
 }
