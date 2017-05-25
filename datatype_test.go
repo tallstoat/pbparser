@@ -14,8 +14,10 @@ func TestScalarDataTypeLookupViaName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		x := lookupScalarType(tt.s)
+		x := lookupScalarTypeFromString(tt.s)
 		fmt.Printf("Scalar Type: %v for input string: %v \n", x, tt.s)
+		y := lookupStringFromScalarType(x)
+		fmt.Printf("String: %v for input Scalar Type: %v \n", y, x)
 	}
 }
 

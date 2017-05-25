@@ -94,9 +94,14 @@ func (sdt ScalarDataType) getScalarType() ScalarType {
 	return sdt.scalarType
 }
 
-// getScalarType returns the ScalarType for the given stringified version
-func lookupScalarType(s string) ScalarType {
+// lookupScalarTypeFromString returns the ScalarType for the given string
+func lookupScalarTypeFromString(s string) ScalarType {
 	return scalarTypeLookup[strings.ToLower(s)]
+}
+
+// lookupStringFromScalarType returns the string representation of a given ScalarType
+func lookupStringFromScalarType(st ScalarType) string {
+	return scalarTypesMap[st]
 }
 
 // NewScalarDataType creates and returns a new ScalarDataType for the given string
