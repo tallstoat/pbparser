@@ -22,11 +22,12 @@ func TestParseFile(t *testing.T) {
 
 	for i, tt := range tests {
 		fmt.Printf("Running test: %v \n\n", i)
-		fmt.Printf("Parsing file: %v \n", tt.file)
 
+		fmt.Printf("Parsing file: %v \n", tt.file)
 		pf, err := pbparser.ParseFile(tt.file)
 		if err != nil {
 			t.Errorf("%v", err.Error())
+			continue
 		}
 
 		fmt.Println("Syntax: " + pf.Syntax)
@@ -63,10 +64,7 @@ func TestParseFile(t *testing.T) {
 		for _, en := range pf.Enums {
 			printEnum(&en)
 		}
-		fmt.Printf("\nFinished test: %v \n\n", i)
 	}
-
-	fmt.Println("done")
 }
 
 func printMessage(m *pbparser.MessageElement) {

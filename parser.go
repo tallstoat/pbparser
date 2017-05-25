@@ -26,7 +26,7 @@ func ParseFile(filePath string) (ProtoFile, error) {
 	r := strings.NewReader(s)
 	br := bufio.NewReader(r)
 
-	loc := location{}
+	loc := location{line: 1, column: 1}
 	parser := parser{br: br, loc: &loc}
 	parser.parser(&pf)
 
@@ -42,12 +42,12 @@ type location struct {
 // The parser. This struct has all the methods which actually perform the
 // job of parsing inputs from a specified reader.
 type parser struct {
-	br  *bufio.Reader
-	loc *location
-	// We set this flag, when eof is encountered...
-	eofReached bool
-	// The current package name + nested type names, separated by dots
-	prefix string
+	br             *bufio.Reader
+	loc            *location
+	eofReached     bool   // We set this flag, when eof is encountered
+	prefix         string // The current package name + nested type names, separated by dots
+	lastRuneRead   rune
+	lastColumnRead int
 }
 
 // This method just looks for documentation and
@@ -113,7 +113,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 	label := p.readWord()
 	if label == "package" {
 		if !ctx.permitsPackage() {
-			msg := fmt.Sprintf("Unexpected 'package' in context: %v", ctx.ctxType)
+			msg := fmt.Sprintf("Unexpected 'package' in context: %v", ctx)
 			return errors.New(msg)
 		}
 		p.skipWhitespace()
@@ -121,7 +121,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		p.prefix = pf.PackageName + "."
 	} else if label == "syntax" {
 		if !ctx.permitsSyntax() {
-			msg := fmt.Sprintf("Unexpected 'syntax' in context: %v", ctx.ctxType)
+			msg := fmt.Sprintf("Unexpected 'syntax' in context: %v", ctx)
 			return errors.New(msg)
 		}
 		if err := p.readSyntax(pf); err != nil {
@@ -129,7 +129,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 	} else if label == "import" {
 		if !ctx.permitsImport() {
-			msg := fmt.Sprintf("Unexpected 'import' in context: %v", ctx.ctxType)
+			msg := fmt.Sprintf("Unexpected 'import' in context: %v", ctx)
 			return errors.New(msg)
 		}
 		if err := p.readImport(pf); err != nil {
@@ -137,7 +137,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 	} else if label == "option" {
 		if !ctx.permitsOption() {
-			msg := fmt.Sprintf("Unexpected 'option' in context: %v", ctx.ctxType)
+			msg := fmt.Sprintf("Unexpected 'option' in context: %v", ctx)
 			return errors.New(msg)
 		}
 		if err := p.readOption(pf, documentation, ctx); err != nil {
@@ -161,7 +161,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 	} else if label == "rpc" {
 		if !ctx.permitsRPC() {
-			msg := fmt.Sprintf("Unexpected 'rpc' in context: %v", ctx.ctxType)
+			msg := fmt.Sprintf("Unexpected 'rpc' in context: %v", ctx)
 			return errors.New(msg)
 		}
 		se := ctx.obj.(*ServiceElement)
@@ -170,7 +170,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 	} else if label == "oneof" {
 		if !ctx.permitsOneOf() {
-			msg := fmt.Sprintf("Unexpected 'oneof' in context: %v", ctx.ctxType)
+			msg := fmt.Sprintf("Unexpected 'oneof' in context: %v", ctx)
 			return errors.New(msg)
 		}
 		if err := p.readOneOf(pf, documentation, ctx); err != nil {
@@ -178,7 +178,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 	} else if label == "extensions" {
 		if !ctx.permitsExtensions() {
-			msg := fmt.Sprintf("Unexpected 'extensions' in context: %v", ctx.ctxType)
+			msg := fmt.Sprintf("Unexpected 'extensions' in context: %v", ctx)
 			return errors.New(msg)
 		}
 		if err := p.readExtensions(pf, documentation, ctx); err != nil {
@@ -186,7 +186,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 	} else if label == "reserved" {
 		if !ctx.permitsReserved() {
-			msg := fmt.Sprintf("Unexpected 'reserved' in context: %v", ctx.ctxType)
+			msg := fmt.Sprintf("Unexpected 'reserved' in context: %v", ctx)
 			return errors.New(msg)
 		}
 		if err := p.readReserved(pf, documentation, ctx); err != nil {
@@ -203,8 +203,10 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		if err := p.readEnumConstant(pf, label, documentation, ctx); err != nil {
 			return err
 		}
+	} else if label != "" {
+		msg := fmt.Sprintf("Unexpected label: %v in context: %v on line: %v", label, ctx, p.loc.line)
+		return errors.New(msg)
 	}
-
 	return nil
 }
 
@@ -561,7 +563,8 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 
 	tag, err := p.readInt()
 	if err != nil {
-		return err
+		msg := fmt.Sprintf("Encountered '%v' while reading tag for Enum Constant on line: %v", err.Error(), p.loc.line)
+		return errors.New(msg)
 	}
 
 	ec := EnumConstantElement{Name: label, Tag: tag, Documentation: documentation}
@@ -1134,7 +1137,13 @@ func (p *parser) skipUntilNewline() {
 
 func (p *parser) unread() {
 	_ = p.br.UnreadRune()
-	p.loc.column--
+
+	if p.lastRuneRead == '\n' {
+		p.loc.line--
+		p.loc.column = p.lastColumnRead
+	} else {
+		p.loc.column--
+	}
 }
 
 func (p *parser) read() rune {
@@ -1142,9 +1151,13 @@ func (p *parser) read() rune {
 	if err != nil {
 		return eof
 	}
+
+	p.lastRuneRead = c
+	p.lastColumnRead = p.loc.column
+
 	if c == '\n' {
 		p.loc.line++
-		p.loc.column = 0
+		p.loc.column = 1
 	} else {
 		p.loc.column++
 	}
