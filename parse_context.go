@@ -22,6 +22,21 @@ const (
 	serviceCtx
 )
 
+var ctxTypeToStringMap = [...]string{
+	fileCtx:    "file",
+	msgCtx:     "message",
+	oneOfCtx:   "oneof",
+	enumCtx:    "enum",
+	rpcCtx:     "rpc",
+	extendCtx:  "extend",
+	serviceCtx: "service",
+}
+
+// the veritable tostring() for java lovers...
+func (pc parseCtx) String() string {
+	return ctxTypeToStringMap[pc.ctxType]
+}
+
 // does this ctx permit package support?
 func (pc parseCtx) permitsPackage() bool {
 	return pc.ctxType == fileCtx
