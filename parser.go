@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,20 +14,45 @@ import (
 // ParseFile This method is to be called with the path
 // of the proto file to be parsed.
 func ParseFile(filePath string) (ProtoFile, error) {
+	// parse the main proto file...
+	pf, err := parseFile(filePath)
+	if err != nil {
+		return pf, err
+	}
+
+	// verify via extra checks...
+	if err := verify(filePath, &pf); err != nil {
+		return pf, err
+	}
+
+	return pf, nil
+}
+
+// ParseFile This method is to be called with the path
+// of the proto file to be parsed.
+func parseFile(filePath string) (ProtoFile, error) {
 	pf := ProtoFile{}
 
+	// read the file contents...
 	raw, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return pf, err
 	}
 
+	// create buffered reader with file contents...
 	s := string(raw[:])
 	r := strings.NewReader(s)
 	br := bufio.NewReader(r)
 
+	// initialize parser...
 	loc := location{line: 1, column: 0}
 	parser := parser{br: br, loc: &loc}
-	parser.parser(&pf)
+
+	// parse the file contents...
+	err = parser.parse(&pf)
+	if err != nil {
+		return pf, err
+	}
 
 	return pf, nil
 }
@@ -52,11 +76,13 @@ type parser struct {
 
 // This method just looks for documentation and
 // then declaration in a loop till EOF is reached
-func (p *parser) parser(pf *ProtoFile) {
+func (p *parser) parse(pf *ProtoFile) error {
 	for {
 		// read any documentation if found...
 		documentation, err := p.readDocumentationIfFound()
-		finishIfNecessary(err)
+		if err != nil {
+			return err
+		}
 		if p.eofReached {
 			break
 		}
@@ -69,11 +95,14 @@ func (p *parser) parser(pf *ProtoFile) {
 
 		// read any declaration...
 		err = p.readDeclaration(pf, documentation, parseCtx{ctxType: fileCtx})
-		finishIfNecessary(err)
+		if err != nil {
+			return err
+		}
 		if p.eofReached {
 			break
 		}
 	}
+	return nil
 }
 
 func (p *parser) readDocumentationIfFound() (string, error) {
@@ -1196,13 +1225,6 @@ func stripQuotes(s string) string {
 		return quoteRemovalRegex.ReplaceAllString(s, "${1}")
 	}
 	return s
-}
-
-func finishIfNecessary(err error) {
-	if err != nil {
-		fmt.Printf("Error: " + err.Error() + "\n")
-		os.Exit(-1)
-	}
 }
 
 func isValidCharInWord(c rune, f func(r rune) bool) bool {

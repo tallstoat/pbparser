@@ -1,6 +1,7 @@
 syntax = "proto3";
-package privatex`;
+package privatex;
 
 message Meh {
   string name = 1;
+  string pincode = 2;
 }
