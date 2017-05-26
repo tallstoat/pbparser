@@ -233,6 +233,28 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 	return nil
 }
 
+func (p *parser) readDeclarationsInLoop(pf *ProtoFile, ctx parseCtx) error {
+	for {
+		doc, err := p.readDocumentationIfFound()
+		if err != nil {
+			return err
+		}
+		p.skipWhitespace()
+		if p.eofReached {
+			break
+		}
+		if c := p.read(); c == '}' {
+			break
+		}
+		p.unread()
+
+		if err = p.readDeclaration(pf, doc, ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (p *parser) readReserved(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	me := ctx.obj.(*MessageElement)
 
@@ -519,25 +541,9 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 		return errors.New(msg)
 	}
 
-	for {
-		nestedDocumentation, err := p.readDocumentationIfFound()
-		if err != nil {
-			return err
-		}
-		p.skipWhitespace()
-		if p.eofReached {
-			break
-		}
-		if c := p.read(); c == '}' {
-			break
-		}
-		p.unread()
-
-		ctx := parseCtx{ctxType: msgCtx, obj: &me}
-		err = p.readDeclaration(pf, nestedDocumentation, ctx)
-		if err != nil {
-			return err
-		}
+	ctx := parseCtx{ctxType: msgCtx, obj: &me}
+	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
+		return err
 	}
 
 	pf.Messages = append(pf.Messages, me)
@@ -635,25 +641,9 @@ func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) er
 		return errors.New(msg)
 	}
 
-	for {
-		nestedDocumentation, err := p.readDocumentationIfFound()
-		if err != nil {
-			return err
-		}
-		p.skipWhitespace()
-		if p.eofReached {
-			break
-		}
-		if c := p.read(); c == '}' {
-			break
-		}
-		p.unread()
-
-		innerCtx := parseCtx{ctxType: oneOfCtx, obj: &oe}
-		err = p.readDeclaration(pf, nestedDocumentation, innerCtx)
-		if err != nil {
-			return err
-		}
+	innerCtx := parseCtx{ctxType: oneOfCtx, obj: &oe}
+	if err = p.readDeclarationsInLoop(pf, innerCtx); err != nil {
+		return err
 	}
 
 	me := ctx.obj.(*MessageElement)
@@ -679,25 +669,9 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 		return errors.New(msg)
 	}
 
-	for {
-		nestedDocumentation, err := p.readDocumentationIfFound()
-		if err != nil {
-			return err
-		}
-		p.skipWhitespace()
-		if p.eofReached {
-			break
-		}
-		if c := p.read(); c == '}' {
-			break
-		}
-		p.unread()
-
-		ctx := parseCtx{ctxType: extendCtx, obj: &ee}
-		err = p.readDeclaration(pf, nestedDocumentation, ctx)
-		if err != nil {
-			return err
-		}
+	ctx := parseCtx{ctxType: extendCtx, obj: &ee}
+	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
+		return err
 	}
 
 	pf.ExtendDeclarations = append(pf.ExtendDeclarations, ee)
@@ -716,30 +690,11 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 		return errors.New(msg)
 	}
 
-	se := ServiceElement{Name: name, QualifiedName: p.prefix + name}
-	if documentation != "" {
-		se.Documentation = documentation
-	}
+	se := ServiceElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
 
-	for {
-		rpcDocumentation, err := p.readDocumentationIfFound()
-		if err != nil {
-			return err
-		}
-		p.skipWhitespace()
-		if p.eofReached {
-			break
-		}
-		if c := p.read(); c == '}' {
-			break
-		}
-		p.unread()
-
-		ctx := parseCtx{ctxType: serviceCtx, obj: &se}
-		err = p.readDeclaration(pf, rpcDocumentation, ctx)
-		if err != nil {
-			return err
-		}
+	ctx := parseCtx{ctxType: serviceCtx, obj: &se}
+	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
+		return err
 	}
 
 	pf.Services = append(pf.Services, se)
@@ -840,37 +795,18 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 	if err != nil {
 		return err
 	}
-	ee := EnumElement{Name: name, QualifiedName: p.prefix + name}
-	if documentation != "" {
-		ee.Documentation = documentation
-	}
+
+	ee := EnumElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
 
 	p.skipWhitespace()
-
 	if c := p.read(); c != '{' {
 		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
 		return errors.New(msg)
 	}
 
-	for {
-		valueDocumentation, err := p.readDocumentationIfFound()
-		if err != nil {
-			return err
-		}
-		p.skipWhitespace()
-		if p.eofReached {
-			break
-		}
-		if c := p.read(); c == '}' {
-			break
-		}
-		p.unread()
-
-		ctx := parseCtx{ctxType: enumCtx, obj: &ee}
-		err = p.readDeclaration(pf, valueDocumentation, ctx)
-		if err != nil {
-			return err
-		}
+	ctx := parseCtx{ctxType: enumCtx, obj: &ee}
+	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
+		return err
 	}
 
 	pf.Enums = append(pf.Enums, ee)
