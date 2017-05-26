@@ -83,10 +83,8 @@ func (p *parser) readDocumentationIfFound() (string, error) {
 			p.eofReached = true
 			break
 		} else if isWhitespace(c) {
-			// if leading whitespace, consume all contiguous whitespace till newline
 			p.skipWhitespace()
 		} else if isStartOfComment(c) {
-			// if start of comment, extract the comment
 			documentation, err := p.readDocumentation()
 			if err != nil {
 				return "", err
@@ -271,7 +269,7 @@ func (p *parser) readReservedRanges(documentation string, me *MessageElement) er
 
 func (p *parser) readReservedNames(documentation string, me *MessageElement) error {
 	for {
-		name, err := p.readQuotedString()
+		name, err := p.readQuotedString(nil)
 		if err != nil {
 			return err
 		}
@@ -850,11 +848,19 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 }
 
 func (p *parser) readImport(pf *ProtoFile) error {
+	// Define special matching function to match file path separator char
+	f := func(r rune) bool {
+		if r == '/' {
+			return true
+		}
+		return false
+	}
+
 	p.skipWhitespace()
 	c := p.read()
 	p.unread()
 	if c == '"' {
-		importString, err := p.readQuotedString()
+		importString, err := p.readQuotedString(f)
 		if err != nil {
 			return err
 		}
@@ -866,7 +872,7 @@ func (p *parser) readImport(pf *ProtoFile) error {
 			return errors.New(msg)
 		}
 		p.skipWhitespace()
-		importString, err := p.readQuotedString()
+		importString, err := p.readQuotedString(f)
 		if err != nil {
 			return err
 		}
@@ -886,7 +892,7 @@ func (p *parser) readSyntax(pf *ProtoFile) error {
 		return errors.New(msg)
 	}
 	p.skipWhitespace()
-	syntax, err := p.readQuotedString()
+	syntax, err := p.readQuotedString(nil)
 	if err != nil {
 		return err
 	}
@@ -901,12 +907,12 @@ func (p *parser) readSyntax(pf *ProtoFile) error {
 	return nil
 }
 
-func (p *parser) readQuotedString() (string, error) {
+func (p *parser) readQuotedString(f func(r rune) bool) (string, error) {
 	if c := p.read(); c != '"' {
 		msg := fmt.Sprintf("Expected starting '\"', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
 		return "", errors.New(msg)
 	}
-	str := p.readWord()
+	str := p.readWordAdvanced(f)
 	if c := p.read(); c != '"' {
 		msg := fmt.Sprintf("Expected ending '\"', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
 		return "", errors.New(msg)
@@ -1011,10 +1017,14 @@ func (p *parser) readName() (string, enclosure, error) {
 }
 
 func (p *parser) readWord() string {
+	return p.readWordAdvanced(nil)
+}
+
+func (p *parser) readWordAdvanced(f func(r rune) bool) string {
 	var buf bytes.Buffer
 	for {
 		c := p.read()
-		if isValidCharInWord(c) {
+		if isValidCharInWord(c, f) {
 			buf.WriteRune(c)
 		} else {
 			p.unread()
@@ -1195,8 +1205,13 @@ func finishIfNecessary(err error) {
 	}
 }
 
-func isValidCharInWord(c rune) bool {
-	return isLetter(c) || isDigit(c) || c == '_' || c == '-' || c == '.'
+func isValidCharInWord(c rune, f func(r rune) bool) bool {
+	if isLetter(c) || isDigit(c) || c == '_' || c == '-' || c == '.' {
+		return true
+	} else if f != nil {
+		return f(c)
+	}
+	return false
 }
 
 func isStartOfComment(c rune) bool {

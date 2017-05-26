@@ -6,13 +6,13 @@ package logtask;
 
 option java_package = "com.google.protobuf";
 
-import public "new.proto";
-import "other.proto";
+import public "test/publicx.proto";
+import "test/meh/privatex.proto";
 
 // LogTask is a service which handles operations on tasks defined via a custom DSL
 service LogTask {
-  // meh doc
-  option meh = true;
+  // foosh doc
+  option foosh = true;
   // AddTask doc
   rpc AddTask (Task) returns (TaskId) {}
   rpc ListTasks(TaskListOptions) returns (TaskList) {}
@@ -20,7 +20,7 @@ service LogTask {
   rpc DeleteTask(TaskId) returns (ReturnStatus) { 
       option crap = true;
   }
-  rpc RouteChat(stream RouteNote) returns (stream RouteNote) {}
+  rpc RouteChat(stream Duh) returns (stream Meh) {}
 }
 
 // Id of the Task...
@@ -44,7 +44,7 @@ message Task {
   repeated string comments = 11;
   // fizzed
   oneof fizzbuzz {
-    option duh = true;
+    option zzz = true;
     string fizz = 12;
     int buzz = 13;
   }  
