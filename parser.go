@@ -26,7 +26,7 @@ func ParseFile(filePath string) (ProtoFile, error) {
 	r := strings.NewReader(s)
 	br := bufio.NewReader(r)
 
-	loc := location{line: 1, column: 1}
+	loc := location{line: 1, column: 0}
 	parser := parser{br: br, loc: &loc}
 	parser.parser(&pf)
 
@@ -1136,14 +1136,11 @@ func (p *parser) skipUntilNewline() {
 }
 
 func (p *parser) unread() {
-	_ = p.br.UnreadRune()
-
-	if p.lastRuneRead == '\n' {
+	if p.loc.column == 0 {
 		p.loc.line--
 		p.loc.column = p.lastColumnRead
-	} else {
-		p.loc.column--
 	}
+	_ = p.br.UnreadRune()
 }
 
 func (p *parser) read() rune {
@@ -1157,7 +1154,7 @@ func (p *parser) read() rune {
 
 	if c == '\n' {
 		p.loc.line++
-		p.loc.column = 1
+		p.loc.column = 0
 	} else {
 		p.loc.column++
 	}
