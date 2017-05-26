@@ -50,11 +50,7 @@ func parseFile(filePath string) (ProtoFile, error) {
 
 	// parse the file contents...
 	err = parser.parse(&pf)
-	if err != nil {
-		return pf, err
-	}
-
-	return pf, nil
+	return pf, err
 }
 
 // This struct tracks current location of the parse process.
@@ -110,20 +106,20 @@ func (p *parser) readDocumentationIfFound() (string, error) {
 		c := p.read()
 		if c == eof {
 			p.eofReached = true
-			break
+			return "", nil
 		} else if isWhitespace(c) {
 			p.skipWhitespace()
+			continue
 		} else if isStartOfComment(c) {
 			documentation, err := p.readDocumentation()
 			if err != nil {
 				return "", err
 			}
 			return documentation, nil
-		} else {
-			// this is not documentation, break out of the loop...
-			p.unread()
-			break
 		}
+		// this is not documentation, break out of the loop...
+		p.unread()
+		break
 	}
 	return "", nil
 }
@@ -327,11 +323,6 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 			"are 'optional' by default.")
 	}
 
-	if (label == "required" || label == "optional" || label == "repeated") && ctx.ctxType == oneOfCtx {
-		msg := fmt.Sprintf("Label '%v' is disallowd in oneoff field on line: %v", label, p.loc.line)
-		return errors.New(msg)
-	}
-
 	// the field struct...
 	fe := FieldElement{Documentation: documentation}
 
@@ -340,6 +331,10 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 
 	// figure out dataTypeStr based on the label...
 	if label == "required" || label == "optional" || label == "repeated" {
+		if ctx.ctxType == oneOfCtx {
+			msg := fmt.Sprintf("Label '%v' is disallowd in oneoff field on line: %v", label, p.loc.line)
+			return errors.New(msg)
+		}
 		fe.Label = label
 		p.skipWhitespace()
 		dataTypeStr = p.readWord()
@@ -879,10 +874,7 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 func (p *parser) readImport(pf *ProtoFile) error {
 	// Define special matching function to match file path separator char
 	f := func(r rune) bool {
-		if r == '/' {
-			return true
-		}
-		return false
+		return r == '/'
 	}
 
 	p.skipWhitespace()
