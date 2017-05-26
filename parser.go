@@ -234,14 +234,20 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 }
 
 func (p *parser) readReserved(pf *ProtoFile, documentation string, ctx parseCtx) error {
-	p.skipWhitespace()
 	me := ctx.obj.(*MessageElement)
+
+	p.skipWhitespace()
 	c := p.read()
 	p.unread()
+
 	if isDigit(c) {
-		p.readReservedRanges(documentation, me)
+		if err := p.readReservedRanges(documentation, me); err != nil {
+			return err
+		}
 	} else {
-		p.readReservedNames(documentation, me)
+		if err := p.readReservedNames(documentation, me); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -643,8 +649,8 @@ func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) er
 		}
 		p.unread()
 
-		ctx := parseCtx{ctxType: oneOfCtx, obj: &oe}
-		err = p.readDeclaration(pf, nestedDocumentation, ctx)
+		innerCtx := parseCtx{ctxType: oneOfCtx, obj: &oe}
+		err = p.readDeclaration(pf, nestedDocumentation, innerCtx)
 		if err != nil {
 			return err
 		}
@@ -1046,7 +1052,7 @@ func (p *parser) readWordAdvanced(f func(r rune) bool) string {
 	for {
 		c := p.read()
 		if isValidCharInWord(c, f) {
-			buf.WriteRune(c)
+			_, _ = buf.WriteRune(c)
 		} else {
 			p.unread()
 			break
@@ -1060,7 +1066,7 @@ func (p *parser) readInt() (int, error) {
 	for {
 		c := p.read()
 		if isDigit(c) {
-			buf.WriteRune(c)
+			_, _ = buf.WriteRune(c)
 		} else {
 			p.unread()
 			break
@@ -1089,13 +1095,13 @@ func (p *parser) readMultiLineComment() string {
 	for {
 		c := p.read()
 		if c != '*' {
-			buf.WriteRune(c)
+			_, _ = buf.WriteRune(c)
 		} else {
 			c2 := p.read()
 			if c2 == '/' {
 				break
 			}
-			buf.WriteRune(c2)
+			_, _ = buf.WriteRune(c2)
 		}
 	}
 	str := buf.String()
@@ -1131,7 +1137,7 @@ func (p *parser) readUntil(terminator rune) string {
 			p.eofReached = true
 			break
 		}
-		buf.WriteRune(c)
+		_, _ = buf.WriteRune(c)
 	}
 	return buf.String()
 }
@@ -1147,7 +1153,7 @@ func (p *parser) readUntilNewline() string {
 			p.eofReached = true
 			break
 		}
-		buf.WriteRune(c)
+		_, _ = buf.WriteRune(c)
 	}
 	return buf.String()
 }

@@ -46,7 +46,7 @@ message Task {
   oneof fizzbuzz {
     option zzz = true;
     string fizz = 12;
-    int buzz = 13;
+    int32 buzz = 13;
   }  
 }
 
