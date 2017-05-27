@@ -4,3 +4,19 @@ package publicx;
 message Duh {
   string id = 1;
 }
+
+// StatusEnum docs for testing StatusEnum...
+enum StatusEnum {
+  UP = 0;
+  DOWN = 1;
+}
+
+message SearchRequest {
+  message Request {
+    string url = 1;
+    string title = 2;
+    repeated string snippets = 3;
+  }
+  repeated Request request = 1;
+}
+

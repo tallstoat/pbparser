@@ -24,14 +24,23 @@ func verify(filePath string, pf *ProtoFile) error {
 		return err
 	}
 
+	packageNames := getDependencyPackageNames(m)
+
+	// check if the NamedDataType fields of messages are all defined in the model;
+	// either the main model or in dependencies
+	fieldsToCheck := getFieldsToCheck(pf.Messages)
+	if err := validateFieldDataTypes(fieldsToCheck, pf.Messages, m); err != nil {
+		return err
+	}
+
 	// check if each rpc request/response type is defined in the model;
 	// either the main model or in dependencies
 	for _, s := range pf.Services {
 		for _, rpc := range s.RPCs {
-			if err := validateRPCDataType(s.Name, rpc.Name, rpc.RequestType, pf.Messages, m); err != nil {
+			if err := validateRPCDataType(pf.PackageName, s.Name, rpc.Name, rpc.RequestType, pf.Messages, m, packageNames); err != nil {
 				return err
 			}
-			if err := validateRPCDataType(s.Name, rpc.Name, rpc.ResponseType, pf.Messages, m); err != nil {
+			if err := validateRPCDataType(pf.PackageName, s.Name, rpc.Name, rpc.ResponseType, pf.Messages, m, packageNames); err != nil {
 				return err
 			}
 		}
@@ -42,17 +51,60 @@ func verify(filePath string, pf *ProtoFile) error {
 	return nil
 }
 
-func validateRPCDataType(service string, rpc string, datatype NamedDataType, msgs []MessageElement, m map[string]ProtoFile) error {
+func getDependencyPackageNames(m map[string]ProtoFile) []string {
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func getFieldsToCheck(msgs []MessageElement) []string {
+	var fields []string
+	for _, msg := range msgs {
+		for _, f := range msg.Fields {
+			if f.Type.Kind() == NamedDataTypeKind {
+				fields = append(fields, f.Name)
+			}
+		}
+	}
+	return fields
+}
+
+func validateFieldDataTypes(fieldsToCheck []string, msgs []MessageElement, m map[string]ProtoFile) error {
+	// TODO: implement this!
+	return nil
+}
+
+func validateRPCDataType(mainpkg string, service string, rpc string, datatype NamedDataType,
+	msgs []MessageElement, m map[string]ProtoFile, packageNames []string) error {
 	found := false
 	if strings.ContainsRune(datatype.Name(), '.') {
-		arr := strings.Split(datatype.Name(), ".")
-		pf, ok := m[arr[0]]
-		if !ok {
-			msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined",
-				arr[0], datatype.Name(), rpc, service)
-			return errors.New(msg)
+		inSamePkg, pkgName := isDatatypeInSamePackage(datatype.Name(), packageNames)
+		if inSamePkg {
+			// Check against normal as well as nested types in same pacakge
+			for _, msg := range msgs {
+				if msg.QualifiedName == mainpkg+"."+datatype.Name() {
+					found = true
+					break
+				}
+			}
+		} else {
+			// Check against normal as well as nested fields in dependency pacakge
+			dpf, ok := m[pkgName]
+			if !ok {
+				msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined",
+					pkgName, datatype.Name(), rpc, service)
+				return errors.New(msg)
+			}
+			// Check against normal as well as nested fields in dependency pacakge
+			for _, msg := range dpf.Messages {
+				if msg.QualifiedName == datatype.Name() {
+					found = true
+					break
+				}
+			}
 		}
-		found = isMsgDefined(arr[1], pf.Messages)
 	} else {
 		found = isMsgDefined(datatype.Name(), msgs)
 	}
@@ -61,6 +113,15 @@ func validateRPCDataType(service string, rpc string, datatype NamedDataType, msg
 		return errors.New(msg)
 	}
 	return nil
+}
+
+func isDatatypeInSamePackage(datatypeName string, packageNames []string) (bool, string) {
+	for _, pkg := range packageNames {
+		if strings.HasPrefix(datatypeName, pkg+".") {
+			return false, pkg
+		}
+	}
+	return true, ""
 }
 
 func isMsgDefined(m string, msgs []MessageElement) bool {

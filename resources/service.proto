@@ -21,6 +21,7 @@ service LogTask {
       option crap = true;
   }
   rpc RouteChat(stream publicx.Duh) returns (stream privatex.Meh) {}
+  rpc RouteCall(stream SearchResponse.Result) returns (stream publicx.SearchRequest.Request) {}
 }
 
 // Id of the Task...
@@ -77,6 +78,8 @@ message TaskUpdateOptions {
 message ReturnStatus {
   bool success = 1;
   string message = 2;
+  publicx.StatusEnum status = 3;  
+  Drama drama = 4;  
   reserved "foo", "bar";
 }
 
