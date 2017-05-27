@@ -136,32 +136,28 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 	label := p.readWord()
 	if label == "package" {
 		if !ctx.permitsPackage() {
-			msg := fmt.Sprintf("Unexpected 'package' in context: %v", ctx)
-			return errors.New(msg)
+			return p.unexpected(label, ctx)
 		}
 		p.skipWhitespace()
 		pf.PackageName = p.readWord()
 		p.prefix = pf.PackageName + "."
 	} else if label == "syntax" {
 		if !ctx.permitsSyntax() {
-			msg := fmt.Sprintf("Unexpected 'syntax' in context: %v", ctx)
-			return errors.New(msg)
+			return p.unexpected(label, ctx)
 		}
 		if err := p.readSyntax(pf); err != nil {
 			return err
 		}
 	} else if label == "import" {
 		if !ctx.permitsImport() {
-			msg := fmt.Sprintf("Unexpected 'import' in context: %v", ctx)
-			return errors.New(msg)
+			return p.unexpected(label, ctx)
 		}
 		if err := p.readImport(pf); err != nil {
 			return err
 		}
 	} else if label == "option" {
 		if !ctx.permitsOption() {
-			msg := fmt.Sprintf("Unexpected 'option' in context: %v", ctx)
-			return errors.New(msg)
+			return p.unexpected(label, ctx)
 		}
 		if err := p.readOption(pf, documentation, ctx); err != nil {
 			return err
@@ -184,8 +180,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 	} else if label == "rpc" {
 		if !ctx.permitsRPC() {
-			msg := fmt.Sprintf("Unexpected 'rpc' in context: %v", ctx)
-			return errors.New(msg)
+			return p.unexpected(label, ctx)
 		}
 		se := ctx.obj.(*ServiceElement)
 		if err := p.readRPC(pf, se, documentation); err != nil {
@@ -193,24 +188,21 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 	} else if label == "oneof" {
 		if !ctx.permitsOneOf() {
-			msg := fmt.Sprintf("Unexpected 'oneof' in context: %v", ctx)
-			return errors.New(msg)
+			return p.unexpected(label, ctx)
 		}
 		if err := p.readOneOf(pf, documentation, ctx); err != nil {
 			return err
 		}
 	} else if label == "extensions" {
 		if !ctx.permitsExtensions() {
-			msg := fmt.Sprintf("Unexpected 'extensions' in context: %v", ctx)
-			return errors.New(msg)
+			return p.unexpected(label, ctx)
 		}
 		if err := p.readExtensions(pf, documentation, ctx); err != nil {
 			return err
 		}
 	} else if label == "reserved" {
 		if !ctx.permitsReserved() {
-			msg := fmt.Sprintf("Unexpected 'reserved' in context: %v", ctx)
-			return errors.New(msg)
+			return p.unexpected(label, ctx)
 		}
 		if err := p.readReserved(pf, documentation, ctx); err != nil {
 			return err
@@ -227,8 +219,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 			return err
 		}
 	} else if label != "" {
-		msg := fmt.Sprintf("Unexpected label: %v in context: %v on line: %v", label, ctx, p.loc.line)
-		return errors.New(msg)
+		return p.unexpected(label, ctx)
 	}
 	return nil
 }
@@ -355,7 +346,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 
 	// figure out dataTypeStr based on the label...
 	var err error
-	var dataTypeStr string
+	dataTypeStr := label
 	if label == "required" || label == "optional" || label == "repeated" {
 		if ctx.ctxType == oneOfCtx {
 			msg := fmt.Sprintf("Label '%v' is disallowd in oneoff field on line: %v", label, p.loc.line)
@@ -364,8 +355,6 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		fe.Label = label
 		p.skipWhitespace()
 		dataTypeStr = p.readWord()
-	} else {
-		dataTypeStr = label
 	}
 
 	// figure out the dataType
@@ -452,16 +441,15 @@ func (p *parser) readListOptions() ([]OptionElement, error) {
 }
 
 func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) error {
+	var err error
+	var enc enclosure
+	oe := OptionElement{}
+
 	p.skipWhitespace()
-	oname, enc, err := p.readName()
-	if err != nil {
+	if oe.Name, enc, err = p.readName(); err != nil {
 		return err
 	}
-
-	hasParenthesis := false
-	if enc == parenthesis {
-		hasParenthesis = true
-	}
+	oe.IsParenthesized = (enc == parenthesis)
 
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
@@ -469,21 +457,17 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 	}
 	p.skipWhitespace()
 
-	var oval string
-	c := p.read()
-	if c == '"' {
-		oval = p.readUntil('"')
+	if p.read() == '"' {
+		oe.Value = p.readUntil('"')
 	} else {
 		p.unread()
-		oval = p.readWord()
+		oe.Value = p.readWord()
 	}
 
 	p.skipWhitespace()
 	if c := p.read(); c != ';' {
 		return p.throw(';', c)
 	}
-
-	oe := OptionElement{Name: oname, Value: oval, IsParenthesized: hasParenthesis}
 
 	// add option to the proper parent...
 	if ctx.ctxType == msgCtx {
@@ -654,28 +638,6 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 	return nil
 }
 
-func (p *parser) readService(pf *ProtoFile, documentation string) error {
-	p.skipWhitespace()
-	name, _, err := p.readName()
-	if err != nil {
-		return err
-	}
-	p.skipWhitespace()
-	if c := p.read(); c != '{' {
-		return p.throw('{', c)
-	}
-
-	se := ServiceElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
-
-	ctx := parseCtx{ctxType: serviceCtx, obj: &se}
-	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
-		return err
-	}
-
-	pf.Services = append(pf.Services, se)
-	return nil
-}
-
 func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
@@ -749,6 +711,28 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 	}
 
 	se.RPCs = append(se.RPCs, rpc)
+	return nil
+}
+
+func (p *parser) readService(pf *ProtoFile, documentation string) error {
+	p.skipWhitespace()
+	name, _, err := p.readName()
+	if err != nil {
+		return err
+	}
+	p.skipWhitespace()
+	if c := p.read(); c != '{' {
+		return p.throw('{', c)
+	}
+
+	se := ServiceElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
+
+	ctx := parseCtx{ctxType: serviceCtx, obj: &se}
+	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
+		return err
+	}
+
+	pf.Services = append(pf.Services, se)
 	return nil
 }
 
@@ -902,6 +886,11 @@ func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 
 	// must be a named type
 	return NamedDataType{name: name}, nil
+}
+
+func (p *parser) unexpected(label string, ctx parseCtx) error {
+	msg := fmt.Sprintf("Unexpected '%v' in context: %v on line: %v", label, ctx, p.loc.line)
+	return errors.New(msg)
 }
 
 func (p *parser) throw(expected rune, actual rune) error {
