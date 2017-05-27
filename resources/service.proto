@@ -20,7 +20,7 @@ service LogTask {
   rpc DeleteTask(TaskId) returns (ReturnStatus) { 
       option crap = true;
   }
-  rpc RouteChat(stream Duh) returns (stream Meh) {}
+  rpc RouteChat(stream publicx.Duh) returns (stream privatex.Meh) {}
 }
 
 // Id of the Task...
