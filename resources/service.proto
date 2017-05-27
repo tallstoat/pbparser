@@ -91,7 +91,7 @@ message SearchResponse {
 
 // EnumAllowingAlias docs for testing...
 enum EnumAllowingAlias {
-  UNKNOWN = 0;
+  UNKNOWN = 0;  //abcd
   STARTED = 1;
   RUNNING = 2;
 }

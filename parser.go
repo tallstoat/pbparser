@@ -353,10 +353,9 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	// the field struct...
 	fe := FieldElement{Documentation: documentation}
 
-	// the string representation of the datatype
-	var dataTypeStr string
-
 	// figure out dataTypeStr based on the label...
+	var err error
+	var dataTypeStr string
 	if label == "required" || label == "optional" || label == "repeated" {
 		if ctx.ctxType == oneOfCtx {
 			msg := fmt.Sprintf("Label '%v' is disallowd in oneoff field on line: %v", label, p.loc.line)
@@ -370,19 +369,15 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	}
 
 	// figure out the dataType
-	dataType, err := p.readDataTypeInternal(dataTypeStr)
-	if err != nil {
+	if fe.Type, err = p.readDataTypeInternal(dataTypeStr); err != nil {
 		return err
 	}
-	fe.Type = dataType
 
 	// figure out the name
 	p.skipWhitespace()
-	name, _, err := p.readName()
-	if err != nil {
+	if fe.Name, _, err = p.readName(); err != nil {
 		return err
 	}
-	fe.Name = name
 
 	// check for equals sign...
 	p.skipWhitespace()
@@ -392,33 +387,14 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 
 	// extract the field tag...
 	p.skipWhitespace()
-	tag, err := p.readInt()
-	if err != nil {
+	if fe.Tag, err = p.readInt(); err != nil {
 		return err
 	}
-	fe.Tag = tag
-
-	p.skipWhitespace()
 
 	// If semicolon is next; we are done. If '[' is next, we must parse options for the field
-	c := p.read()
-	if c == '[' {
-		foptions, err := p.readListOptions()
-		if err != nil {
-			return err
-		}
-		fe.Options = foptions
-		c2 := p.read()
-		if c2 != ';' {
-			return p.throw(';', c2)
-		}
-	} else if c != ';' {
-		return p.throw(';', c)
+	if fe.Options, err = p.readListOptionsOnALine(); err != nil {
+		return err
 	}
-
-	// Gobble up any inline documentation for a field
-	// TODO: maybe store this as field.Documentation?
-	p.skipUntilNewline()
 
 	// add field to the proper parent	...
 	if ctx.ctxType == msgCtx {
@@ -432,6 +408,29 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		oe.Fields = append(oe.Fields, fe)
 	}
 	return nil
+}
+
+// readListOptionsOnALine reads list options provided on a line.
+// generally relevant for fields and enum constant declarations.
+func (p *parser) readListOptionsOnALine() ([]OptionElement, error) {
+	var err error
+	var options []OptionElement
+	p.skipWhitespace()
+	c := p.read()
+	if c == '[' {
+		if options, err = p.readListOptions(); err != nil {
+			return nil, err
+		}
+		c2 := p.read()
+		if c2 != ';' {
+			return nil, p.throw(';', c2)
+		}
+	} else if c != ';' {
+		return nil, p.throw(';', c)
+	}
+	// Gobble up any inline documentation for a field
+	p.skipUntilNewline()
+	return options, nil
 }
 
 func (p *parser) readListOptions() ([]OptionElement, error) {
@@ -587,28 +586,17 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 	}
 	p.skipWhitespace()
 
-	tag, err := p.readInt()
-	if err != nil {
+	var err error
+	ec := EnumConstantElement{Name: label, Documentation: documentation}
+
+	if ec.Tag, err = p.readInt(); err != nil {
 		msg := fmt.Sprintf("Encountered '%v' while reading tag for Enum Constant on line: %v", err.Error(), p.loc.line)
 		return errors.New(msg)
 	}
 
-	ec := EnumConstantElement{Name: label, Tag: tag, Documentation: documentation}
-
-	p.skipWhitespace()
-	c := p.read()
-	if c == '[' {
-		ecOptions, err := p.readListOptions()
-		if err != nil {
-			return err
-		}
-		ec.Options = ecOptions
-		c2 := p.read()
-		if c2 != ';' {
-			return p.throw(';', c2)
-		}
-	} else if c != ';' {
-		return p.throw(';', c)
+	// If semicolon is next; we are done. If '[' is next, we must parse options for the enum constant
+	if ec.Options, err = p.readListOptionsOnALine(); err != nil {
+		return err
 	}
 
 	ee := ctx.obj.(*EnumElement)
