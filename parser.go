@@ -336,8 +336,7 @@ func (p *parser) readReservedNames(documentation string, me *MessageElement) err
 
 		// if not, there should be more names provided after a comma...
 		if c != ',' {
-			msg := fmt.Sprintf("Expected ',', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-			return errors.New(msg)
+			return p.throw(',', c)
 		}
 		p.skipWhitespace()
 	}
@@ -388,8 +387,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	// check for equals sign...
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
-		msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('=', c)
 	}
 
 	// extract the field tag...
@@ -412,12 +410,10 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		fe.Options = foptions
 		c2 := p.read()
 		if c2 != ';' {
-			msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c2), p.loc.line, p.loc.column)
-			return errors.New(msg)
+			return p.throw(';', c2)
 		}
 	} else if c != ';' {
-		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw(';', c)
 	}
 
 	// Gobble up any inline documentation for a field
@@ -470,8 +466,7 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
-		msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('=', c)
 	}
 	p.skipWhitespace()
 
@@ -486,8 +481,7 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 
 	p.skipWhitespace()
 	if c := p.read(); c != ';' {
-		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw(';', c)
 	}
 
 	oe := OptionElement{Name: oname, Value: oval, IsParenthesized: hasParenthesis}
@@ -537,8 +531,7 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 
 	p.skipWhitespace()
 	if c := p.read(); c != '{' {
-		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('{', c)
 	}
 
 	ctx := parseCtx{ctxType: msgCtx, obj: &me}
@@ -590,8 +583,7 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
-		msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('=', c)
 	}
 	p.skipWhitespace()
 
@@ -613,12 +605,10 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 		ec.Options = ecOptions
 		c2 := p.read()
 		if c2 != ';' {
-			msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c2), p.loc.line, p.loc.column)
-			return errors.New(msg)
+			return p.throw(';', c2)
 		}
 	} else if c != ';' {
-		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw(';', c)
 	}
 
 	ee := ctx.obj.(*EnumElement)
@@ -637,8 +627,7 @@ func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) er
 
 	p.skipWhitespace()
 	if c := p.read(); c != '{' {
-		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('{', c)
 	}
 
 	innerCtx := parseCtx{ctxType: oneOfCtx, obj: &oe}
@@ -665,8 +654,7 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 
 	p.skipWhitespace()
 	if c := p.read(); c != '{' {
-		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('{', c)
 	}
 
 	ctx := parseCtx{ctxType: extendCtx, obj: &ee}
@@ -686,8 +674,7 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 	}
 	p.skipWhitespace()
 	if c := p.read(); c != '{' {
-		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('{', c)
 	}
 
 	se := ServiceElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
@@ -707,62 +694,53 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 	if err != nil {
 		return err
 	}
-
-	rpc := RPCElement{Name: name, Documentation: documentation}
-
 	p.skipWhitespace()
 	if c := p.read(); c != '(' {
-		msg := fmt.Sprintf("Expected '(', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('(', c)
 	}
+
+	// var requestType, responseType NamedDataType
+	rpc := RPCElement{Name: name, Documentation: documentation}
 
 	// parse request type...
-	var requestType NamedDataType
-	requestType, err = p.readRequestResponseType()
-	if err != nil {
+	if rpc.RequestType, err = p.readRequestResponseType(); err != nil {
 		return err
 	}
-	rpc.RequestType = requestType
-	if c := p.read(); c != ')' {
-		msg := fmt.Sprintf("Expected ')', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
-	}
 
+	if c := p.read(); c != ')' {
+		return p.throw(')', c)
+	}
 	p.skipWhitespace()
-	keyword := p.readWord()
-	if keyword != "returns" {
+
+	if keyword := p.readWord(); keyword != "returns" {
 		msg := fmt.Sprintf("Expected 'returns', but found: %v on line: %v", keyword, p.loc.line)
 		return errors.New(msg)
 	}
 
 	p.skipWhitespace()
 	if c := p.read(); c != '(' {
-		msg := fmt.Sprintf("Expected '(', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('(', c)
 	}
 
 	// parse response type...
-	var responseType NamedDataType
-	responseType, err = p.readRequestResponseType()
-	if err != nil {
+	if rpc.ResponseType, err = p.readRequestResponseType(); err != nil {
 		return err
 	}
-	rpc.ResponseType = responseType
-	if c := p.read(); c != ')' {
-		msg := fmt.Sprintf("Expected ')', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
-	}
 
+	if c := p.read(); c != ')' {
+		return p.throw(')', c)
+	}
 	p.skipWhitespace()
+
 	c := p.read()
 	if c == '{' {
+		ctx := parseCtx{ctxType: rpcCtx, obj: &rpc}
 		for {
 			c2 := p.read()
 			if c2 == '}' {
 				break
 			}
 			p.unread()
-
 			if p.eofReached {
 				break
 			}
@@ -774,15 +752,12 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 			p.skipWhitespace()
 
 			//parse for options...
-			ctx := parseCtx{ctxType: rpcCtx, obj: &rpc}
-			err = p.readDeclaration(pf, withinRPCBracketsDocumentation, ctx)
-			if err != nil {
+			if err = p.readDeclaration(pf, withinRPCBracketsDocumentation, ctx); err != nil {
 				return err
 			}
 		}
 	} else if c != ';' {
-		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw(';', c)
 	}
 
 	se.RPCs = append(se.RPCs, rpc)
@@ -795,15 +770,12 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 	if err != nil {
 		return err
 	}
-
-	ee := EnumElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
-
 	p.skipWhitespace()
 	if c := p.read(); c != '{' {
-		msg := fmt.Sprintf("Expected '{', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('{', c)
 	}
 
+	ee := EnumElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
 	ctx := parseCtx{ctxType: enumCtx, obj: &ee}
 	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
 		return err
@@ -842,8 +814,7 @@ func (p *parser) readImport(pf *ProtoFile) error {
 		pf.PublicDependencies = append(pf.PublicDependencies, importString)
 	}
 	if c := p.read(); c != ';' {
-		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw(';', c)
 	}
 	return nil
 }
@@ -851,8 +822,7 @@ func (p *parser) readImport(pf *ProtoFile) error {
 func (p *parser) readSyntax(pf *ProtoFile) error {
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
-		msg := fmt.Sprintf("Expected '=', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw('=', c)
 	}
 	p.skipWhitespace()
 	syntax, err := p.readQuotedString(nil)
@@ -863,8 +833,7 @@ func (p *parser) readSyntax(pf *ProtoFile) error {
 		return errors.New("'syntax' must be 'proto2' or 'proto3'. Found: " + syntax)
 	}
 	if c := p.read(); c != ';' {
-		msg := fmt.Sprintf("Expected ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return errors.New(msg)
+		return p.throw(';', c)
 	}
 	pf.Syntax = syntax
 	return nil
@@ -872,13 +841,11 @@ func (p *parser) readSyntax(pf *ProtoFile) error {
 
 func (p *parser) readQuotedString(f func(r rune) bool) (string, error) {
 	if c := p.read(); c != '"' {
-		msg := fmt.Sprintf("Expected starting '\"', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return "", errors.New(msg)
+		return "", p.throw('"', c)
 	}
 	str := p.readWordAdvanced(f)
 	if c := p.read(); c != '"' {
-		msg := fmt.Sprintf("Expected ending '\"', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-		return "", errors.New(msg)
+		return "", p.throw('"', c)
 	}
 	return str, nil
 }
@@ -918,8 +885,7 @@ func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 	// is it a map type?
 	if name == "map" {
 		if c := p.read(); c != '<' {
-			msg := fmt.Sprintf("Expected '<', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-			return nil, errors.New(msg)
+			return nil, p.throw('<', c)
 		}
 		var err error
 		var keyType, valueType DataType
@@ -928,16 +894,14 @@ func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 			return nil, err
 		}
 		if c := p.read(); c != ',' {
-			msg := fmt.Sprintf("Expected ',', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-			return nil, errors.New(msg)
+			return nil, p.throw(',', c)
 		}
 		valueType, err = p.readDataType()
 		if err != nil {
 			return nil, err
 		}
 		if c := p.read(); c != '>' {
-			msg := fmt.Sprintf("Expected '>', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-			return nil, errors.New(msg)
+			return nil, p.throw('>', c)
 		}
 		return MapDataType{keyType: keyType, valueType: valueType}, nil
 	}
@@ -950,6 +914,12 @@ func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 
 	// must be a named type
 	return NamedDataType{name: name}, nil
+}
+
+func (p *parser) throw(expected rune, actual rune) error {
+	msg := fmt.Sprintf("Expected %v, but found: %v on line: %v, column: %v",
+		strconv.QuoteRune(expected), strconv.QuoteRune(actual), p.loc.line, p.loc.column)
+	return errors.New(msg)
 }
 
 func (p *parser) readName() (string, enclosure, error) {
