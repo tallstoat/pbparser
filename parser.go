@@ -31,7 +31,7 @@ func ParseFile(filePath string) (ProtoFile, error) {
 // ParseFile This method is to be called with the path
 // of the proto file to be parsed.
 func parseFile(filePath string) (ProtoFile, error) {
-	pf := ProtoFile{}
+	pf := ProtoFile{FilePath: filePath}
 
 	// read the file contents...
 	raw, err := ioutil.ReadFile(filePath)
@@ -339,6 +339,8 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		return errors.New("Explicit 'optional' labels are disallowed in the Proto3 syntax. " +
 			"To define 'optional' fields in Proto3, simply remove the 'optional' label, as fields " +
 			"are 'optional' by default.")
+	} else if label == "required" && pf.Syntax == "proto3" {
+		return errors.New("Required fields are not allowed in proto3")
 	}
 
 	// the field struct...
@@ -527,6 +529,10 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 }
 
 func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCtx) error {
+	if pf.Syntax == "proto3" {
+		return errors.New("Extension ranges are not allowed in proto3")
+	}
+
 	p.skipWhitespace()
 	start, err := p.readInt()
 	if err != nil {

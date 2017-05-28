@@ -1,7 +1,7 @@
 /* Task object blah blah adsd
 sfsf fafasf affaf fasfaf
 */
-syntax = "proto3";
+syntax = "proto2";
 package logtask;
 
 option java_package = "com.google.protobuf";

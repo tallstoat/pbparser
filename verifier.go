@@ -8,6 +8,11 @@ import (
 )
 
 func verify(filePath string, pf *ProtoFile) error {
+	// validate syntax
+	if err := validateSyntax(pf); err != nil {
+		return err
+	}
+
 	// find the base dir...
 	dir := filepath.Dir(filePath)
 
@@ -51,6 +56,14 @@ func verify(filePath string, pf *ProtoFile) error {
 
 	// TODO: add more checks here
 
+	return nil
+}
+
+func validateSyntax(pf *ProtoFile) error {
+	if pf.Syntax == "" {
+		msg := fmt.Sprintf("No syntax specified for the proto file: %v", pf.FilePath)
+		return errors.New(msg)
+	}
 	return nil
 }
 
@@ -126,7 +139,7 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 			// Check against normal as well as nested fields in dependency pacakge
 			dpf, ok := m[pkgName]
 			if !ok {
-				msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message",
+				msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message type",
 					pkgName, datatype.Name(), rpc, service)
 				return errors.New(msg)
 			}
@@ -137,7 +150,7 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 		found = checkMsgName(datatype.Name(), msgs)
 	}
 	if !found {
-		msg := fmt.Sprintf("Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message", datatype.Name(), rpc, service)
+		msg := fmt.Sprintf("Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message type", datatype.Name(), rpc, service)
 		return errors.New(msg)
 	}
 	return nil
@@ -187,6 +200,11 @@ func parseDependencies(dir string, fpath string, dependencies []string, m map[st
 			msg := fmt.Sprintf("Unable to parse dependency %v (at: %v) of file: %v. Reason:: %v", d, dependencyPath, fpath, err.Error())
 			return errors.New(msg)
 		}
+
+		if err := validateSyntax(&dpf); err != nil {
+			return err
+		}
+
 		m[dpf.PackageName] = dpf
 	}
 	return nil
