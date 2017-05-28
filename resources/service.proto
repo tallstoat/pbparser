@@ -79,7 +79,7 @@ message ReturnStatus {
   bool success = 1;
   string message = 2;
   publicx.StatusEnum status = 3;  
-  Drama drama = 4;  
+  //Drama drama = 4;  
   reserved "foo", "bar";
 }
 

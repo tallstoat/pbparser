@@ -29,7 +29,7 @@ func verify(filePath string, pf *ProtoFile) error {
 	// check if the NamedDataType fields of messages are all defined in the model;
 	// either the main model or in dependencies
 	fieldsToCheck := getFieldsToCheck(pf.Messages)
-	if err := validateFieldDataTypes(fieldsToCheck, pf.Messages, m); err != nil {
+	if err := validateFieldDataTypes(pf.PackageName, fieldsToCheck, pf.Messages, pf.Enums, m, packageNames); err != nil {
 		return err
 	}
 
@@ -59,20 +59,78 @@ func getDependencyPackageNames(m map[string]ProtoFile) []string {
 	return keys
 }
 
-func getFieldsToCheck(msgs []MessageElement) []string {
-	var fields []string
+type fd struct {
+	name string
+	kind string
+}
+
+func getFieldsToCheck(msgs []MessageElement) []fd {
+	var fields []fd
 	for _, msg := range msgs {
 		for _, f := range msg.Fields {
 			if f.Type.Kind() == NamedDataTypeKind {
-				fields = append(fields, f.Name)
+				fields = append(fields, fd{name: f.Name, kind: f.Type.Name()})
 			}
 		}
 	}
 	return fields
 }
 
-func validateFieldDataTypes(fieldsToCheck []string, msgs []MessageElement, m map[string]ProtoFile) error {
-	// TODO: implement this!
+func validateFieldDataTypes(mainpkg string, fields []fd, msgs []MessageElement, enums []EnumElement,
+	m map[string]ProtoFile, packageNames []string) error {
+	for _, f := range fields {
+		found := false
+		if strings.ContainsRune(f.kind, '.') {
+			inSamePkg, pkgName := isDatatypeInSamePackage(f.kind, packageNames)
+			if inSamePkg {
+				// Check against normal as well as nested types in same pacakge
+				for _, msg := range msgs {
+					if msg.QualifiedName == mainpkg+"."+f.kind {
+						found = true
+						break
+					}
+				}
+				// Check against normal as well as nested enums in same pacakge
+				if !found {
+					for _, en := range enums {
+						if en.QualifiedName == mainpkg+"."+f.kind {
+							found = true
+							break
+						}
+					}
+				}
+			} else {
+				// Check against normal as well as nested fields in dependency pacakge
+				dpf, ok := m[pkgName]
+				if !ok {
+					msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in field: '%v' is not defined", pkgName, f.kind, f.name)
+					return errors.New(msg)
+				}
+				// Check against normal as well as nested fields in dependency pacakge
+				for _, msg := range dpf.Messages {
+					if msg.QualifiedName == f.kind {
+						found = true
+						break
+					}
+				}
+				// Check against normal as well as nested enums in dependency pacakge
+				if !found {
+					for _, en := range dpf.Enums {
+						if en.QualifiedName == f.kind {
+							found = true
+							break
+						}
+					}
+				}
+			}
+		} else {
+			found = checkMsgName(f.kind, msgs)
+		}
+		if !found {
+			msg := fmt.Sprintf("Datatype: '%v' referenced in field: '%v' is not defined", f.kind, f.name)
+			return errors.New(msg)
+		}
+	}
 	return nil
 }
 
@@ -93,7 +151,7 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 			// Check against normal as well as nested fields in dependency pacakge
 			dpf, ok := m[pkgName]
 			if !ok {
-				msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined",
+				msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message",
 					pkgName, datatype.Name(), rpc, service)
 				return errors.New(msg)
 			}
@@ -106,10 +164,10 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 			}
 		}
 	} else {
-		found = isMsgDefined(datatype.Name(), msgs)
+		found = checkMsgName(datatype.Name(), msgs)
 	}
 	if !found {
-		msg := fmt.Sprintf("Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined", datatype.Name(), rpc, service)
+		msg := fmt.Sprintf("Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message", datatype.Name(), rpc, service)
 		return errors.New(msg)
 	}
 	return nil
@@ -124,7 +182,7 @@ func isDatatypeInSamePackage(datatypeName string, packageNames []string) (bool, 
 	return true, ""
 }
 
-func isMsgDefined(m string, msgs []MessageElement) bool {
+func checkMsgName(m string, msgs []MessageElement) bool {
 	for _, msg := range msgs {
 		if msg.Name == m {
 			return true
