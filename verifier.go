@@ -24,16 +24,19 @@ func verify(filePath string, pf *ProtoFile) error {
 		return err
 	}
 
+	// collate the dependency package names...
 	packageNames := getDependencyPackageNames(m)
 
-	// check if the NamedDataType fields of messages are all defined in the model;
+	// validate if the NamedDataType fields of messages are all defined in the model;
 	// either the main model or in dependencies
-	fieldsToCheck := getFieldsToCheck(pf.Messages)
-	if err := validateFieldDataTypes(pf.PackageName, fieldsToCheck, pf.Messages, pf.Enums, m, packageNames); err != nil {
-		return err
+	fields := findFieldsToValidate(pf.Messages)
+	for _, f := range fields {
+		if err := validateFieldDataTypes(pf.PackageName, f, pf.Messages, pf.Enums, m, packageNames); err != nil {
+			return err
+		}
 	}
 
-	// check if each rpc request/response type is defined in the model;
+	// validate if each rpc request/response type is defined in the model;
 	// either the main model or in dependencies
 	for _, s := range pf.Services {
 		for _, rpc := range s.RPCs {
@@ -64,7 +67,7 @@ type fd struct {
 	kind string
 }
 
-func getFieldsToCheck(msgs []MessageElement) []fd {
+func findFieldsToValidate(msgs []MessageElement) []fd {
 	var fields []fd
 	for _, msg := range msgs {
 		for _, f := range msg.Fields {
@@ -76,60 +79,37 @@ func getFieldsToCheck(msgs []MessageElement) []fd {
 	return fields
 }
 
-func validateFieldDataTypes(mainpkg string, fields []fd, msgs []MessageElement, enums []EnumElement,
-	m map[string]ProtoFile, packageNames []string) error {
-	for _, f := range fields {
-		found := false
-		if strings.ContainsRune(f.kind, '.') {
-			inSamePkg, pkgName := isDatatypeInSamePackage(f.kind, packageNames)
-			if inSamePkg {
-				// Check against normal as well as nested types in same pacakge
-				for _, msg := range msgs {
-					if msg.QualifiedName == mainpkg+"."+f.kind {
-						found = true
-						break
-					}
-				}
-				// Check against normal as well as nested enums in same pacakge
-				if !found {
-					for _, en := range enums {
-						if en.QualifiedName == mainpkg+"."+f.kind {
-							found = true
-							break
-						}
-					}
-				}
-			} else {
-				// Check against normal as well as nested fields in dependency pacakge
-				dpf, ok := m[pkgName]
-				if !ok {
-					msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in field: '%v' is not defined", pkgName, f.kind, f.name)
-					return errors.New(msg)
-				}
-				// Check against normal as well as nested fields in dependency pacakge
-				for _, msg := range dpf.Messages {
-					if msg.QualifiedName == f.kind {
-						found = true
-						break
-					}
-				}
-				// Check against normal as well as nested enums in dependency pacakge
-				if !found {
-					for _, en := range dpf.Enums {
-						if en.QualifiedName == f.kind {
-							found = true
-							break
-						}
-					}
-				}
+func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums []EnumElement, m map[string]ProtoFile, packageNames []string) error {
+	found := false
+	if strings.ContainsRune(f.kind, '.') {
+		inSamePkg, pkgName := isDatatypeInSamePackage(f.kind, packageNames)
+		if inSamePkg {
+			// Check against normal as well as nested types in same pacakge
+			found = checkMsgQualifiedName(mainpkg+"."+f.kind, msgs)
+			// Check against normal as well as nested enums in same pacakge
+			if !found {
+				found = checkEnumQualifiedName(mainpkg+"."+f.kind, enums)
 			}
 		} else {
-			found = checkMsgName(f.kind, msgs)
+			// Check against normal as well as nested fields in dependency pacakge
+			dpf, ok := m[pkgName]
+			if !ok {
+				msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in field: '%v' is not defined", pkgName, f.kind, f.name)
+				return errors.New(msg)
+			}
+			// Check against normal as well as nested fields in dependency pacakge
+			found = checkMsgQualifiedName(f.kind, dpf.Messages)
+			// Check against normal as well as nested enums in dependency pacakge
+			if !found {
+				found = checkEnumQualifiedName(f.kind, dpf.Enums)
+			}
 		}
-		if !found {
-			msg := fmt.Sprintf("Datatype: '%v' referenced in field: '%v' is not defined", f.kind, f.name)
-			return errors.New(msg)
-		}
+	} else {
+		found = checkMsgName(f.kind, msgs)
+	}
+	if !found {
+		msg := fmt.Sprintf("Datatype: '%v' referenced in field: '%v' is not defined", f.kind, f.name)
+		return errors.New(msg)
 	}
 	return nil
 }
@@ -141,12 +121,7 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 		inSamePkg, pkgName := isDatatypeInSamePackage(datatype.Name(), packageNames)
 		if inSamePkg {
 			// Check against normal as well as nested types in same pacakge
-			for _, msg := range msgs {
-				if msg.QualifiedName == mainpkg+"."+datatype.Name() {
-					found = true
-					break
-				}
-			}
+			found = checkMsgQualifiedName(mainpkg+"."+datatype.Name(), msgs)
 		} else {
 			// Check against normal as well as nested fields in dependency pacakge
 			dpf, ok := m[pkgName]
@@ -156,12 +131,7 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 				return errors.New(msg)
 			}
 			// Check against normal as well as nested fields in dependency pacakge
-			for _, msg := range dpf.Messages {
-				if msg.QualifiedName == datatype.Name() {
-					found = true
-					break
-				}
-			}
+			found = checkMsgQualifiedName(datatype.Name(), dpf.Messages)
 		}
 	} else {
 		found = checkMsgName(datatype.Name(), msgs)
@@ -185,6 +155,24 @@ func isDatatypeInSamePackage(datatypeName string, packageNames []string) (bool, 
 func checkMsgName(m string, msgs []MessageElement) bool {
 	for _, msg := range msgs {
 		if msg.Name == m {
+			return true
+		}
+	}
+	return false
+}
+
+func checkMsgQualifiedName(s string, msgs []MessageElement) bool {
+	for _, msg := range msgs {
+		if msg.QualifiedName == s {
+			return true
+		}
+	}
+	return false
+}
+
+func checkEnumQualifiedName(s string, enums []EnumElement) bool {
+	for _, en := range enums {
+		if en.QualifiedName == s {
 			return true
 		}
 	}
