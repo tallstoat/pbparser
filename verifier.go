@@ -16,7 +16,7 @@ func verify(filePath string, pf *ProtoFile) error {
 	// find the base dir...
 	dir := filepath.Dir(filePath)
 
-	// make a map of dependency file name to its parsed model...
+	// make a map of dependency package to its parsed model...
 	m := make(map[string]ProtoFile)
 
 	// parse the dependencies...
@@ -97,25 +97,16 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 	if strings.ContainsRune(f.kind, '.') {
 		inSamePkg, pkgName := isDatatypeInSamePackage(f.kind, packageNames)
 		if inSamePkg {
-			// Check against normal as well as nested types in same pacakge
-			found = checkMsgQualifiedName(mainpkg+"."+f.kind, msgs)
-			// Check against normal as well as nested enums in same pacakge
-			if !found {
-				found = checkEnumQualifiedName(mainpkg+"."+f.kind, enums)
-			}
+			// Check against normal and nested types & enums in same pacakge
+			found = checkMsgOrEnumQualifiedName(mainpkg+"."+f.kind, msgs, enums)
 		} else {
-			// Check against normal as well as nested fields in dependency pacakge
 			dpf, ok := m[pkgName]
 			if !ok {
 				msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in field: '%v' is not defined", pkgName, f.kind, f.name)
 				return errors.New(msg)
 			}
-			// Check against normal as well as nested fields in dependency pacakge
-			found = checkMsgQualifiedName(f.kind, dpf.Messages)
-			// Check against normal as well as nested enums in dependency pacakge
-			if !found {
-				found = checkEnumQualifiedName(f.kind, dpf.Enums)
-			}
+			// Check against normal and nested types & enums in dependency pacakge
+			found = checkMsgOrEnumQualifiedName(f.kind, dpf.Messages, dpf.Enums)
 		}
 	} else {
 		found = checkMsgName(f.kind, msgs)
@@ -136,7 +127,6 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 			// Check against normal as well as nested types in same pacakge
 			found = checkMsgQualifiedName(mainpkg+"."+datatype.Name(), msgs)
 		} else {
-			// Check against normal as well as nested fields in dependency pacakge
 			dpf, ok := m[pkgName]
 			if !ok {
 				msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message type",
@@ -172,6 +162,13 @@ func checkMsgName(m string, msgs []MessageElement) bool {
 		}
 	}
 	return false
+}
+
+func checkMsgOrEnumQualifiedName(s string, msgs []MessageElement, enums []EnumElement) bool {
+	if checkMsgQualifiedName(s, msgs) {
+		return true
+	}
+	return checkEnumQualifiedName(s, enums)
 }
 
 func checkMsgQualifiedName(s string, msgs []MessageElement) bool {

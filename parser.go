@@ -28,7 +28,7 @@ func ParseFile(filePath string) (ProtoFile, error) {
 	return pf, nil
 }
 
-// ParseFile This method is to be called with the path
+// parseFile This internal method is to be called with the path
 // of the proto file to be parsed.
 func parseFile(filePath string) (ProtoFile, error) {
 	pf := ProtoFile{FilePath: filePath}
