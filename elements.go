@@ -10,9 +10,9 @@ type OptionElement struct {
 // EnumConstantElement ...
 type EnumConstantElement struct {
 	Name          string
-	Tag           int
 	Documentation string
 	Options       []OptionElement
+	Tag           int
 }
 
 // EnumElement ...
@@ -46,18 +46,18 @@ type ServiceElement struct {
 type FieldElement struct {
 	Name          string
 	Documentation string
+	Options       []OptionElement
 	Label         string /* optional, required, repeated, oneof */
 	Type          DataType
 	Tag           int
-	Options       []OptionElement
 }
 
 // OneOfElement ...
 type OneOfElement struct {
 	Name          string
 	Documentation string
-	Fields        []FieldElement
 	Options       []OptionElement
+	Fields        []FieldElement
 }
 
 // ExtensionsElement ...
@@ -104,9 +104,9 @@ type ProtoFile struct {
 	Syntax             string
 	Dependencies       []string
 	PublicDependencies []string
+	Options            []OptionElement
 	Enums              []EnumElement
 	Messages           []MessageElement
 	Services           []ServiceElement
 	ExtendDeclarations []ExtendElement
-	Options            []OptionElement
 }
