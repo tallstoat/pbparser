@@ -105,7 +105,11 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 			found = checkMsgOrEnumQualifiedName(f.kind, dpf.Messages, dpf.Enums)
 		}
 	} else {
+		// Check both messages and enums
 		found = checkMsgName(f.kind, msgs)
+		if !found {
+			found = checkEnumName(f.kind, enums)
+		}
 	}
 	if !found {
 		msg := fmt.Sprintf("Datatype: '%v' referenced in field: '%v' is not defined", f.kind, f.name)
@@ -154,6 +158,15 @@ func isDatatypeInSamePackage(datatypeName string, packageNames []string) (bool, 
 func checkMsgName(m string, msgs []MessageElement) bool {
 	for _, msg := range msgs {
 		if msg.Name == m {
+			return true
+		}
+	}
+	return false
+}
+
+func checkEnumName(s string, enums []EnumElement) bool {
+	for _, en := range enums {
+		if en.Name == s {
 			return true
 		}
 	}
