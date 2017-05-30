@@ -3,29 +3,25 @@ package pbparser
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 )
 
-func verify(filePath string, pf *ProtoFile) error {
+func verify(pf *ProtoFile, impr ImportModuleProvider) error {
 	// validate syntax
 	if err := validateSyntax(pf); err != nil {
 		return err
 	}
 
-	// find the base dir...
-	dir := filepath.Dir(filePath)
-
 	// make a map of dependency package to its parsed model...
 	m := make(map[string]ProtoFile)
 
 	// parse the dependencies...
-	if err := parseDependencies(dir, filePath, pf.Dependencies, m); err != nil {
+	if err := parseDependencies(impr, pf.Dependencies, m); err != nil {
 		return err
 	}
 
 	// parse the public dependencies...
-	if err := parseDependencies(dir, filePath, pf.PublicDependencies, m); err != nil {
+	if err := parseDependencies(impr, pf.PublicDependencies, m); err != nil {
 		return err
 	}
 
@@ -189,12 +185,21 @@ func checkEnumQualifiedName(s string, enums []EnumElement) bool {
 	return false
 }
 
-func parseDependencies(dir string, fpath string, dependencies []string, m map[string]ProtoFile) error {
+func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[string]ProtoFile) error {
 	for _, d := range dependencies {
-		dependencyPath := dir + string(filepath.Separator) + d
-		dpf, err := parseFile(dependencyPath)
+		r, err := impr.Provide(d)
 		if err != nil {
-			msg := fmt.Sprintf("Unable to parse dependency %v (at: %v) of file: %v. Reason:: %v", d, dependencyPath, fpath, err.Error())
+			msg := fmt.Sprintf("ImportModuleReader is unable to provide content of dependency module %v. Reason:: %v", d, err.Error())
+			return errors.New(msg)
+		}
+		if r == nil {
+			msg := fmt.Sprintf("ImportModuleReader is unable to provide reader for dependency module %v", d)
+			return errors.New(msg)
+		}
+
+		dpf := ProtoFile{}
+		if err := parse(r, &dpf); err != nil {
+			msg := fmt.Sprintf("Unable to parse dependency %v. Reason:: %v", d, err.Error())
 			return errors.New(msg)
 		}
 

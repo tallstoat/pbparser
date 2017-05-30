@@ -5,43 +5,52 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
-// ParseFile This method is to be called with the path
-// of the proto file to be parsed.
-func ParseFile(filePath string) (ProtoFile, error) {
+// Parse ...
+func Parse(r io.Reader, impr ImportModuleProvider) (ProtoFile, error) {
+	pf := ProtoFile{}
+
 	// parse the main proto file...
-	pf, err := parseFile(filePath)
-	if err != nil {
+	if err := parse(r, &pf); err != nil {
 		return pf, err
 	}
 
 	// verify via extra checks...
-	if err := verify(filePath, &pf); err != nil {
+	if err := verify(&pf, impr); err != nil {
 		return pf, err
 	}
 
 	return pf, nil
 }
 
-// parseFile This internal method is to be called with the path
-// of the proto file to be parsed.
-func parseFile(filePath string) (ProtoFile, error) {
-	pf := ProtoFile{FilePath: filePath}
-
-	// read the file contents...
+// ParseFile This method when invoked with the path
+// of the proto file to be parsed, parses it and returns
+// the populated ProtoFile struct
+func ParseFile(filePath string) (ProtoFile, error) {
+	// read the proto file contents & create a reader...
 	raw, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return pf, err
+		return ProtoFile{}, err
 	}
+	r := strings.NewReader(string(raw[:]))
 
-	// create buffered reader with file contents...
-	s := string(raw[:])
-	r := strings.NewReader(s)
+	// create default import module provider...
+	dir := filepath.Dir(filePath)
+	impr := defaultImportModuleProviderImpl{dir: dir}
+
+	return Parse(r, &impr)
+}
+
+// parse This internal method is to be called with the reader for the main proto file
+// & a pointer to the ProtoFile struct to be populated post parsing & verification.
+func parse(r io.Reader, pf *ProtoFile) error {
 	br := bufio.NewReader(r)
 
 	// initialize parser...
@@ -49,8 +58,7 @@ func parseFile(filePath string) (ProtoFile, error) {
 	parser := parser{br: br, loc: &loc}
 
 	// parse the file contents...
-	err = parser.parse(&pf)
-	return pf, err
+	return parser.parse(pf)
 }
 
 // This struct tracks current location of the parse process.
