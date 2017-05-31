@@ -1,0 +1,19 @@
+syntax = "proto3";
+package math;
+
+option java_package = "com.google.protobuf";
+
+import "internal/numbers.proto";
+
+// MathService is a service which performs simple mathematical operations
+service MathService {
+  rpc Add(numbers.Numbers) returns (Result) {}
+  rpc Multiply(numbers.Numbers) returns (Result) {}
+}
+
+// Result is what you get post a mathematical operation
+message Result {
+  int32 output = 1;
+  string message = 2;
+}
+

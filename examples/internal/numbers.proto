@@ -1,0 +1,9 @@
+syntax = "proto3";
+package numbers;
+
+// Numbers is what you provide as input to a mathematical operation
+message Numbers {
+  int32 first = 1;
+  int32 second = 2;
+}
+
