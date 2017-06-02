@@ -61,8 +61,7 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 
 func validateSyntax(pf *ProtoFile) error {
 	if pf.Syntax == "" {
-		msg := fmt.Sprintf("No syntax specified for the proto file: %v", pf.FilePath)
-		return errors.New(msg)
+		return errors.New("No syntax specified in the proto file")
 	}
 	return nil
 }

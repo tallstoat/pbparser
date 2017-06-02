@@ -42,7 +42,6 @@ ProtoFile datastructure
 This datastructure represents parsed model of the given protobuf file. It includes the following information :-
 
 	type ProtoFile struct {
-		FilePath           string               // the path of the proto file
 		PackageName        string               // name of the package
 		Syntax             string               // the protocol buffer syntax
 		Dependencies       []string             // names of any imports
