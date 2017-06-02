@@ -73,12 +73,12 @@ type ScalarDataType struct {
 	name       string
 }
 
-// Name method implementation of interface DataType for ScalarDataType
+// Name function implementation of interface DataType for ScalarDataType
 func (sdt ScalarDataType) Name() string {
 	return sdt.name
 }
 
-// Category method implementation of interface DataType for ScalarDataType
+// Category function implementation of interface DataType for ScalarDataType
 func (sdt ScalarDataType) Category() DataTypeCategory {
 	return ScalarDataTypeCategory
 }
@@ -101,12 +101,12 @@ type MapDataType struct {
 	valueType DataType
 }
 
-// Name method implementation of interface DataType for MapDataType
+// Name function implementation of interface DataType for MapDataType
 func (mdt MapDataType) Name() string {
 	return "map<" + mdt.keyType.Name() + ", " + mdt.valueType.Name() + ">"
 }
 
-// Category method implementation of interface DataType for MapDataType
+// Category function implementation of interface DataType for MapDataType
 func (mdt MapDataType) Category() DataTypeCategory {
 	return MapDataTypeCategory
 }
@@ -119,12 +119,12 @@ type NamedDataType struct {
 	name              string
 }
 
-// Name method implementation of interface DataType for NamedDataType
+// Name function implementation of interface DataType for NamedDataType
 func (ndt NamedDataType) Name() string {
 	return ndt.name
 }
 
-// Category method implementation of interface DataType for NamedDataType
+// Category function implementation of interface DataType for NamedDataType
 func (ndt NamedDataType) Category() DataTypeCategory {
 	return NamedDataTypeCategory
 }

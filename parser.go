@@ -66,7 +66,7 @@ func ParseFile(file string) (ProtoFile, error) {
 	return Parse(r, &impr)
 }
 
-// parse This internal method is to be called with the reader for the main proto file
+// parse is an internal function which is invoked with the reader for the main proto file
 // & a pointer to the ProtoFile struct to be populated post parsing & verification.
 func parse(r io.Reader, pf *ProtoFile) error {
 	br := bufio.NewReader(r)
@@ -85,7 +85,7 @@ type location struct {
 	line   int
 }
 
-// The parser. This struct has all the methods which actually perform the
+// The parser. This struct has all the functions which actually perform the
 // job of parsing inputs from a specified reader.
 type parser struct {
 	br             *bufio.Reader
@@ -96,7 +96,7 @@ type parser struct {
 	lastColumnRead int
 }
 
-// This method just looks for documentation and
+// This function just looks for documentation and
 // then declaration in a loop till EOF is reached
 func (p *parser) parse(pf *ProtoFile) error {
 	for {
