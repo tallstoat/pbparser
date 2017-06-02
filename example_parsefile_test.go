@@ -9,10 +9,10 @@ import (
 
 // Example code for the ParseFile() API
 func Example_parseFile() {
-	filePath := "./examples/mathservice.proto"
+	file := "./examples/mathservice.proto"
 
 	// invoke ParseFile() API to parse the file
-	pf, err := pbparser.ParseFile(filePath)
+	pf, err := pbparser.ParseFile(file)
 	if err != nil {
 		fmt.Printf("Unable to parse proto file: %v \n", err)
 		os.Exit(-1)

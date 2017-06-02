@@ -14,7 +14,11 @@ import (
 )
 
 // Parse ...
-func Parse(r io.Reader, impr ImportModuleProvider) (ProtoFile, error) {
+func Parse(r io.Reader, p ImportModuleProvider) (ProtoFile, error) {
+	if r == nil {
+		return ProtoFile{}, errors.New("Reader for protobuf content is mandatory")
+	}
+
 	pf := ProtoFile{}
 
 	// parse the main proto file...
@@ -23,7 +27,7 @@ func Parse(r io.Reader, impr ImportModuleProvider) (ProtoFile, error) {
 	}
 
 	// verify via extra checks...
-	if err := verify(&pf, impr); err != nil {
+	if err := verify(&pf, p); err != nil {
 		return pf, err
 	}
 
@@ -33,16 +37,20 @@ func Parse(r io.Reader, impr ImportModuleProvider) (ProtoFile, error) {
 // ParseFile This method when invoked with the path
 // of the proto file to be parsed, parses it and returns
 // the populated ProtoFile struct
-func ParseFile(filePath string) (ProtoFile, error) {
+func ParseFile(file string) (ProtoFile, error) {
+	if file == "" {
+		return ProtoFile{}, errors.New("File is mandatory")
+	}
+
 	// read the proto file contents & create a reader...
-	raw, err := ioutil.ReadFile(filePath)
+	raw, err := ioutil.ReadFile(file)
 	if err != nil {
 		return ProtoFile{}, err
 	}
 	r := strings.NewReader(string(raw[:]))
 
 	// create default import module provider...
-	dir := filepath.Dir(filePath)
+	dir := filepath.Dir(file)
 	impr := defaultImportModuleProviderImpl{dir: dir}
 
 	return Parse(r, &impr)

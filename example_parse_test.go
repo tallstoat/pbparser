@@ -14,8 +14,8 @@ import (
 // Example code for the Parse() API
 func Example_parse() {
 	// read the proto file contents from disk & create a reader
-	filePath := "./examples/mathservice.proto"
-	raw, err := ioutil.ReadFile(filePath)
+	file := "./examples/mathservice.proto"
+	raw, err := ioutil.ReadFile(file)
 	if err != nil {
 		fmt.Printf("Unable to read proto file: %v \n", err)
 		os.Exit(-1)
@@ -24,7 +24,7 @@ func Example_parse() {
 
 	// implement a dir based import module provider which reads
 	// import modules from the same dir as the original proto file
-	dir := filepath.Dir(filePath)
+	dir := filepath.Dir(file)
 	pr := DirBasedImportModuleProvider{dir: dir}
 
 	// invoke Parse() API to parse the file

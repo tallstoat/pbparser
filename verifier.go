@@ -6,22 +6,26 @@ import (
 	"strings"
 )
 
-func verify(pf *ProtoFile, impr ImportModuleProvider) error {
+func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	// validate syntax
 	if err := validateSyntax(pf); err != nil {
 		return err
+	}
+
+	if (len(pf.Dependencies) > 0 || len(pf.PublicDependencies) > 0) && p == nil {
+		return errors.New("ImportModuleProvider is required to validate imports")
 	}
 
 	// make a map of dependency package to its parsed model...
 	m := make(map[string]ProtoFile)
 
 	// parse the dependencies...
-	if err := parseDependencies(impr, pf.Dependencies, m); err != nil {
+	if err := parseDependencies(p, pf.Dependencies, m); err != nil {
 		return err
 	}
 
 	// parse the public dependencies...
-	if err := parseDependencies(impr, pf.PublicDependencies, m); err != nil {
+	if err := parseDependencies(p, pf.PublicDependencies, m); err != nil {
 		return err
 	}
 
@@ -50,7 +54,7 @@ func verify(pf *ProtoFile, impr ImportModuleProvider) error {
 		}
 	}
 
-	// TODO: add more checks here
+	// TODO: add more checks here if needed
 
 	return nil
 }
