@@ -13,7 +13,13 @@ import (
 	"strings"
 )
 
-// Parse ...
+// Parse function parses the protobuf content passed to it by the the client code via
+// the reader. It also uses the passed-in ImportModuleProvider to callback the client
+// code for any imports in the protobuf content. If there are no imports, the client
+// can choose to pass this as nil.
+//
+// This function returns populated ProtoFile struct if parsing is successful.
+// If the parsing or validation fails, it returns an Error.
 func Parse(r io.Reader, p ImportModuleProvider) (ProtoFile, error) {
 	if r == nil {
 		return ProtoFile{}, errors.New("Reader for protobuf content is mandatory")
@@ -34,9 +40,13 @@ func Parse(r io.Reader, p ImportModuleProvider) (ProtoFile, error) {
 	return pf, nil
 }
 
-// ParseFile This method when invoked with the path
-// of the proto file to be parsed, parses it and returns
-// the populated ProtoFile struct
+// ParseFile function reads and parses the content of the protobuf file whose
+// path is provided as sole argument to the function. If there are any imports
+// in the protobuf file, the parser will look for them in the same directory
+// where the protobuf file resides.
+//
+// This function returns populated ProtoFile struct if parsing is successful.
+// If the parsing or validation fails, it returns an Error.
 func ParseFile(file string) (ProtoFile, error) {
 	if file == "" {
 		return ProtoFile{}, errors.New("File is mandatory")
