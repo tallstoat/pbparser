@@ -75,16 +75,16 @@ func getDependencyPackageNames(m map[string]ProtoFile) []string {
 }
 
 type fd struct {
-	name string
-	kind string
+	name     string
+	category string
 }
 
 func findFieldsToValidate(msgs []MessageElement) []fd {
 	var fields []fd
 	for _, msg := range msgs {
 		for _, f := range msg.Fields {
-			if f.Type.Kind() == NamedDataTypeKind {
-				fields = append(fields, fd{name: f.Name, kind: f.Type.Name()})
+			if f.Type.Category() == NamedDataTypeCategory {
+				fields = append(fields, fd{name: f.Name, category: f.Type.Name()})
 			}
 		}
 	}
@@ -93,29 +93,29 @@ func findFieldsToValidate(msgs []MessageElement) []fd {
 
 func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums []EnumElement, m map[string]ProtoFile, packageNames []string) error {
 	found := false
-	if strings.ContainsRune(f.kind, '.') {
-		inSamePkg, pkgName := isDatatypeInSamePackage(f.kind, packageNames)
+	if strings.ContainsRune(f.category, '.') {
+		inSamePkg, pkgName := isDatatypeInSamePackage(f.category, packageNames)
 		if inSamePkg {
 			// Check against normal and nested types & enums in same pacakge
-			found = checkMsgOrEnumQualifiedName(mainpkg+"."+f.kind, msgs, enums)
+			found = checkMsgOrEnumQualifiedName(mainpkg+"."+f.category, msgs, enums)
 		} else {
 			dpf, ok := m[pkgName]
 			if !ok {
-				msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in field: '%v' is not defined", pkgName, f.kind, f.name)
+				msg := fmt.Sprintf("Package '%v' of Datatype: '%v' referenced in field: '%v' is not defined", pkgName, f.category, f.name)
 				return errors.New(msg)
 			}
 			// Check against normal and nested types & enums in dependency pacakge
-			found = checkMsgOrEnumQualifiedName(f.kind, dpf.Messages, dpf.Enums)
+			found = checkMsgOrEnumQualifiedName(f.category, dpf.Messages, dpf.Enums)
 		}
 	} else {
 		// Check both messages and enums
-		found = checkMsgName(f.kind, msgs)
+		found = checkMsgName(f.category, msgs)
 		if !found {
-			found = checkEnumName(f.kind, enums)
+			found = checkEnumName(f.category, enums)
 		}
 	}
 	if !found {
-		msg := fmt.Sprintf("Datatype: '%v' referenced in field: '%v' is not defined", f.kind, f.name)
+		msg := fmt.Sprintf("Datatype: '%v' referenced in field: '%v' is not defined", f.category, f.name)
 		return errors.New(msg)
 	}
 	return nil

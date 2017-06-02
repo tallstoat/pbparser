@@ -6,26 +6,28 @@ import (
 	"strings"
 )
 
-// DataTypeKind the kind of datatype
-type DataTypeKind int
+// DataTypeCategory is an enumeration which represents the possible kinds
+// of field datatypes in message, oneof and extend declaration constructs.
+type DataTypeCategory int
 
-// DataTypeKind the supported kinds
 const (
-	ScalarDataTypeKind DataTypeKind = iota
-	MapDataTypeKind
-	NamedDataTypeKind
+	ScalarDataTypeCategory DataTypeCategory = iota
+	MapDataTypeCategory
+	NamedDataTypeCategory
 )
 
-// DataType the interface to be implemented by the supported datatypes
+// DataType is the interface which must be implemented by the field datatypes.
+// Name() returns the name of the datatype and Category() returns the category
+// of the datatype.
 type DataType interface {
-	Kind() DataTypeKind
 	Name() string
+	Category() DataTypeCategory
 }
 
-// ScalarType the supported scalar types
+// ScalarType is an enumeration which represents all known supported scalar
+// field datatypes.
 type ScalarType int
 
-// ScalarType the supported scalar types
 const (
 	AnyScalar ScalarType = iota + 1
 	BoolScalar
@@ -45,69 +47,47 @@ const (
 	Uint64Scalar
 )
 
-var scalarTypesMap = [...]string{
-	AnyScalar:      "any",
-	BoolScalar:     "bool",
-	BytesScalar:    "bytes",
-	DoubleScalar:   "double",
-	FloatScalar:    "float",
-	Fixed32Scalar:  "fixed32",
-	Fixed64Scalar:  "fixed64",
-	Int32Scalar:    "int32",
-	Int64Scalar:    "int64",
-	Sfixed32Scalar: "sfixed32",
-	Sfixed64Scalar: "sfixed64",
-	Sint32Scalar:   "sint32",
-	Sint64Scalar:   "sint64",
-	StringScalar:   "string",
-	Uint32Scalar:   "uint32",
-	Uint64Scalar:   "uint64",
+var scalarLookupMap = map[string]ScalarType{
+	"any":      AnyScalar,
+	"bool":     BoolScalar,
+	"bytes":    BytesScalar,
+	"double":   DoubleScalar,
+	"float":    FloatScalar,
+	"fixed32":  Fixed32Scalar,
+	"fixed64":  Fixed64Scalar,
+	"int32":    Int32Scalar,
+	"int64":    Int64Scalar,
+	"sfixed32": Sfixed32Scalar,
+	"sfixed64": Sfixed64Scalar,
+	"sint32":   Sint32Scalar,
+	"sint64":   Sint64Scalar,
+	"string":   StringScalar,
+	"uint32":   Uint32Scalar,
+	"uint64":   Uint64Scalar,
 }
 
-var scalarTypeLookup map[string]ScalarType
-
-func init() {
-	scalarTypeLookup = make(map[string]ScalarType)
-	for i := AnyScalar; i <= Uint64Scalar; i++ {
-		scalarTypeLookup[strings.ToLower(scalarTypesMap[i])] = i
-	}
-}
-
-// ScalarDataType ...
+// ScalarDataType is a construct which represents
+// all supported protobuf scalar datatypes.
 type ScalarDataType struct {
 	scalarType ScalarType
 	name       string
 }
 
-// Kind method from interface DataType
-func (sdt ScalarDataType) Kind() DataTypeKind {
-	return ScalarDataTypeKind
-}
-
-// Name method from interface DataType
+// Name method implementation of interface DataType for ScalarDataType
 func (sdt ScalarDataType) Name() string {
 	return sdt.name
 }
 
-// getScalarType return the scalarType of a SclataDataType
-func (sdt ScalarDataType) getScalarType() ScalarType {
-	return sdt.scalarType
+// Category method implementation of interface DataType for ScalarDataType
+func (sdt ScalarDataType) Category() DataTypeCategory {
+	return ScalarDataTypeCategory
 }
 
-// lookupScalarTypeFromString returns the ScalarType for the given string
-func lookupScalarTypeFromString(s string) ScalarType {
-	return scalarTypeLookup[strings.ToLower(s)]
-}
-
-// lookupStringFromScalarType returns the string representation of a given ScalarType
-func lookupStringFromScalarType(st ScalarType) string {
-	return scalarTypesMap[st]
-}
-
-// NewScalarDataType creates and returns a new ScalarDataType for the given string
+// NewScalarDataType creates and returns a new ScalarDataType for the given string.
+// If a scalar data type mapping does not exist for the given string, an Error is returned.
 func NewScalarDataType(s string) (ScalarDataType, error) {
 	key := strings.ToLower(s)
-	st := scalarTypeLookup[key]
+	st := scalarLookupMap[key]
 	if st == 0 {
 		msg := fmt.Sprintf("'%v' is not a valid ScalarDataType", s)
 		return ScalarDataType{}, errors.New(msg)
@@ -115,44 +95,47 @@ func NewScalarDataType(s string) (ScalarDataType, error) {
 	return ScalarDataType{name: key, scalarType: st}, nil
 }
 
-// MapDataType ...
+// MapDataType is a construct which represents a protobuf map datatype.
 type MapDataType struct {
 	keyType   DataType
 	valueType DataType
 }
 
-// Kind method from interface DataType
-func (mdt MapDataType) Kind() DataTypeKind {
-	return MapDataTypeKind
-}
-
-// Name method from interface DataType
+// Name method implementation of interface DataType for MapDataType
 func (mdt MapDataType) Name() string {
 	return "map<" + mdt.keyType.Name() + ", " + mdt.valueType.Name() + ">"
 }
 
-// NamedDataType ...
+// Category method implementation of interface DataType for MapDataType
+func (mdt MapDataType) Category() DataTypeCategory {
+	return MapDataTypeCategory
+}
+
+// NamedDataType is a construct which represents a message datatype as
+// a RPC request or response and a message/enum datatype as a field in
+// message, oneof or extend declarations.
 type NamedDataType struct {
 	supportsStreaming bool
 	name              string
 }
 
-// Kind method from interface DataType
-func (ndt NamedDataType) Kind() DataTypeKind {
-	return NamedDataTypeKind
-}
-
-// Name method from interface DataType
+// Name method implementation of interface DataType for NamedDataType
 func (ndt NamedDataType) Name() string {
 	return ndt.name
 }
 
-// IsStream method from interface DataType
+// Category method implementation of interface DataType for NamedDataType
+func (ndt NamedDataType) Category() DataTypeCategory {
+	return NamedDataTypeCategory
+}
+
+// IsStream returns true if the NamedDataType is being used in a rpc
+// as a request or response and is preceded by a Stream keyword.
 func (ndt NamedDataType) IsStream() bool {
 	return ndt.supportsStreaming
 }
 
-// stream method from interface DataType
+// stream marks a NamedDataType as being preceded by a Stream keyword.
 func (ndt *NamedDataType) stream(flag bool) {
 	ndt.supportsStreaming = flag
 }
