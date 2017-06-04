@@ -235,7 +235,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		}
 	} else if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx || ctx.ctxType == oneOfCtx {
 		if !ctx.permitsField() {
-			return errors.New("fields must be nested")
+			return p.errline("fields must be nested")
 		}
 		if err := p.readField(pf, label, documentation, ctx); err != nil {
 			return err
@@ -312,8 +312,7 @@ func (p *parser) readReservedRanges(documentation string, me *MessageElement) er
 			p.unread()
 			p.skipWhitespace()
 			if w := p.readWord(); w != "to" {
-				msg := fmt.Sprintf("Expected 'to', but found: %v on line: %v", w, p.loc.line)
-				return errors.New(msg)
+				return p.errline("Expected 'to', but found: %v", w)
 			}
 			p.skipWhitespace()
 			end, err := p.readInt()
@@ -329,8 +328,7 @@ func (p *parser) readReservedRanges(documentation string, me *MessageElement) er
 				me.ReservedRanges = append(me.ReservedRanges, rr)
 				p.skipWhitespace()
 			} else {
-				msg := fmt.Sprintf("Expected ',' or ';', but found: %v on line: %v, column: %v", strconv.QuoteRune(c2), p.loc.line, p.loc.column)
-				return errors.New(msg)
+				return p.errline("Expected ',' or ';', but found: %v", strconv.QuoteRune(c2))
 			}
 		}
 	}
@@ -362,11 +360,11 @@ func (p *parser) readReservedNames(documentation string, me *MessageElement) err
 
 func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
 	if label == "optional" && pf.Syntax == "proto3" {
-		return errors.New("Explicit 'optional' labels are disallowed in the Proto3 syntax. " +
+		return p.errline("Explicit 'optional' labels are disallowed in the Proto3 syntax. " +
 			"To define 'optional' fields in Proto3, simply remove the 'optional' label, as fields " +
 			"are 'optional' by default.")
 	} else if label == "required" && pf.Syntax == "proto3" {
-		return errors.New("Required fields are not allowed in proto3")
+		return p.errline("Required fields are not allowed in proto3")
 	}
 
 	// the field struct...
@@ -377,8 +375,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	dataTypeStr := label
 	if label == "required" || label == "optional" || label == "repeated" {
 		if ctx.ctxType == oneOfCtx {
-			msg := fmt.Sprintf("Label '%v' is disallowd in oneoff field on line: %v", label, p.loc.line)
-			return errors.New(msg)
+			return p.errline("Label '%v' is disallowd in oneoff field", label)
 		}
 		fe.Label = label
 		p.skipWhitespace()
@@ -393,20 +390,20 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	// perform checks for map data type...
 	if fe.Type.Category() == MapDataTypeCategory {
 		if fe.Label == "repeated" || fe.Label == "required" || fe.Label == "optional" {
-			return errors.New("Label " + fe.Label + " is not allowed on map fields")
+			return p.errline("Label %v is not allowed on map fields", fe.Label)
 		}
 		if ctx.ctxType == oneOfCtx {
-			return errors.New("Map fields are not allowed in oneofs")
+			return p.errline("Map fields are not allowed in oneofs")
 		}
 		if ctx.ctxType == extendCtx {
-			return errors.New("Map fields are not allowed to be extensions")
+			return p.errline("Map fields are not allowed to be extensions")
 		}
 		mdt := fe.Type.(MapDataType)
 		if mdt.keyType.Name() == "float" || mdt.keyType.Name() == "double" || mdt.keyType.Name() == "bytes" {
-			return errors.New("Key in map fields cannot be float/double or bytes")
+			return p.errline("Key in map fields cannot be float, double or bytes")
 		}
 		if mdt.keyType.Category() == NamedDataTypeCategory {
-			return errors.New("Key in map fields cannot be named types")
+			return p.errline("Key in map fields cannot be named types")
 		}
 	}
 
@@ -477,8 +474,7 @@ func (p *parser) readListOptions() ([]OptionElement, error) {
 	for _, pair := range pairs {
 		arr := strings.Split(pair, "=")
 		if len(arr) != 2 {
-			msg := fmt.Sprintf("Option '%v' is not specified as expected on line: %v", arr, p.loc.line)
-			return nil, errors.New(msg)
+			return nil, p.errline("Option '%v' is not specified as expected", arr)
 		}
 		oname, hasParenthesis := stripParenthesis(strings.TrimSpace(arr[0]))
 		oval := stripQuotes(strings.TrimSpace(arr[1]))
@@ -576,7 +572,7 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 
 func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	if pf.Syntax == "proto3" {
-		return errors.New("Extension ranges are not allowed in proto3")
+		return p.errline("Extension ranges are not allowed in proto3")
 	}
 
 	p.skipWhitespace()
@@ -593,8 +589,7 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 		p.unread()
 		p.skipWhitespace()
 		if w := p.readWord(); w != "to" {
-			msg := fmt.Sprintf("Expected 'to', but found: %v on line: %v", w, p.loc.line)
-			return errors.New(msg)
+			return p.errline("Expected 'to', but found: %v", w)
 		}
 		p.skipWhitespace()
 		var end int
@@ -626,8 +621,7 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 	ec := EnumConstantElement{Name: label, Documentation: documentation}
 
 	if ec.Tag, err = p.readInt(); err != nil {
-		msg := fmt.Sprintf("Encountered '%v' while reading tag for Enum Constant on line: %v", err.Error(), p.loc.line)
-		return errors.New(msg)
+		return p.errline("Encountered '%v' while reading tag for Enum Constant", err.Error())
 	}
 
 	// If semicolon is next; we are done. If '[' is next, we must parse options for the enum constant
@@ -715,8 +709,7 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 	p.skipWhitespace()
 
 	if keyword := p.readWord(); keyword != "returns" {
-		msg := fmt.Sprintf("Expected 'returns', but found: %v on line: %v", keyword, p.loc.line)
-		return errors.New(msg)
+		return p.errline("Expected 'returns', but found: %v", keyword)
 	}
 
 	p.skipWhitespace()
@@ -827,8 +820,7 @@ func (p *parser) readImport(pf *ProtoFile) error {
 	} else {
 		publicStr := p.readWord()
 		if "public" != publicStr {
-			msg := fmt.Sprintf("Expected 'public', but found: %v on line: %v", publicStr, p.loc.line)
-			return errors.New(msg)
+			return p.errline("Expected 'public', but found: %v", publicStr)
 		}
 		p.skipWhitespace()
 		importString, err := p.readQuotedString(f)
@@ -854,7 +846,7 @@ func (p *parser) readSyntax(pf *ProtoFile) error {
 		return err
 	}
 	if syntax != "proto2" && syntax != "proto3" {
-		return errors.New("'syntax' must be 'proto2' or 'proto3'. Found: " + syntax)
+		return p.errline("'syntax' must be 'proto2' or 'proto3'. Found: %v", syntax)
 	}
 	if c := p.read(); c != ';' {
 		return p.throw(';', c)
@@ -942,14 +934,21 @@ func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 }
 
 func (p *parser) unexpected(label string, ctx parseCtx) error {
-	msg := fmt.Sprintf("Unexpected '%v' in context: %v on line: %v", label, ctx, p.loc.line)
-	return errors.New(msg)
+	return p.errline("Unexpected '%v' in context: %v", label, ctx)
 }
 
 func (p *parser) throw(expected rune, actual rune) error {
-	msg := fmt.Sprintf("Expected %v, but found: %v on line: %v, column: %v",
-		strconv.QuoteRune(expected), strconv.QuoteRune(actual), p.loc.line, p.loc.column)
-	return errors.New(msg)
+	return p.errcol("Expected %v, but found: %v", strconv.QuoteRune(expected), strconv.QuoteRune(actual))
+}
+
+func (p *parser) errline(msg string, a ...interface{}) error {
+	s := fmt.Sprintf(msg, a...)
+	return fmt.Errorf(s+" on line: %v", p.loc.line)
+}
+
+func (p *parser) errcol(msg string, a ...interface{}) error {
+	s := fmt.Sprintf(msg, a...)
+	return fmt.Errorf(s+" on line: %v, column: %v", p.loc.line, p.loc.column)
 }
 
 func (p *parser) readName() (string, enclosure, error) {
@@ -960,16 +959,14 @@ func (p *parser) readName() (string, enclosure, error) {
 		enc = parenthesis
 		name = p.readWord()
 		if p.read() != ')' {
-			msg := fmt.Sprintf("Expected ')' on line: %v, column: %v", p.loc.line, p.loc.column)
-			return "", enc, errors.New(msg)
+			return "", enc, p.errline("Expected ')'")
 		}
 		p.unread()
 	} else if c == '[' {
 		enc = bracket
 		name = p.readWord()
 		if p.read() != ']' {
-			msg := fmt.Sprintf("Expected ']' on line: %v, column: %v", p.loc.line, p.loc.column)
-			return "", enc, errors.New(msg)
+			return "", enc, p.errline("Expected ']'")
 		}
 		p.unread()
 	} else {
@@ -1020,10 +1017,7 @@ func (p *parser) readDocumentation() (string, error) {
 	} else if c == '*' {
 		return p.readMultiLineComment(), nil
 	}
-
-	msg := fmt.Sprintf("Expected '/' or '*', but found: %v on line: %v, column: %v", strconv.QuoteRune(c), p.loc.line, p.loc.column)
-	err := errors.New(msg)
-	return "", err
+	return "", p.errline("Expected '/' or '*', but found: %v", strconv.QuoteRune(c))
 }
 
 func (p *parser) readMultiLineComment() string {
