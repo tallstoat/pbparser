@@ -4,8 +4,8 @@ sfsf fafasf affaf fasfaf
 syntax = "proto3";
 package logtask;
 
-import public "new.proto";
-import "other.proto";
+//import public "new.proto";
+//import "other.proto";
 
 // LogTask is a service which handles operations on tasks defined via a custom DSL
 service LogTask {
@@ -13,7 +13,11 @@ service LogTask {
   rpc ListTasks(TaskListOptions) returns (TaskList) {}
   rpc UpdateTask(TaskUpdateOptions) returns (ReturnStatus) {}
   rpc DeleteTask(TaskId) returns (ReturnStatus) {}
-  rpc RouteChat(int32) returns (stream int32) {}
+  rpc RouteChat(TaskId) returns (stream ReturnStatus) {}
+}
+
+service AuditTask {
+  rpc AuditTask (Task) returns (TaskId) {}
 }
 
 // Id of the Task...
@@ -36,12 +40,8 @@ message Task {
   repeated string comments = 11;
   oneof fizzbuzz {
     string fizz = 12;
-    int buzz = 13;
+    int32 buzz = 13;
   }  
-}
-
-extend Task {
-  int32 bar = 126;
 }
 
 // List of tasks...
@@ -53,8 +53,12 @@ message TaskList {
 message TaskListOptions {
   string status = 1;
   string for = 2;
-  extensions 1000 to max;
+  //extensions 500 to 600;
 }
+
+//extend TaskListOptions {
+//  int32 bar = 510;
+//}
 
 // Options to pass in for updating a task...
 message TaskUpdateOptions {

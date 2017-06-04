@@ -4,55 +4,44 @@ sfsf fafasf affaf fasfaf
 syntax = "proto2";
 package logtask;
 
-option java_package = "com.google.protobuf";
-
-import public "internal/publicx.proto";
-import "internal/ext/privatex.proto";
+//import public "new.proto";
+//import "other.proto";
 
 // LogTask is a service which handles operations on tasks defined via a custom DSL
 service LogTask {
-  // foosh doc
-  option foosh = true;
-  // AddTask doc
   rpc AddTask (Task) returns (TaskId) {}
   rpc ListTasks(TaskListOptions) returns (TaskList) {}
   rpc UpdateTask(TaskUpdateOptions) returns (ReturnStatus) {}
-  rpc DeleteTask(TaskId) returns (ReturnStatus) { 
-      option crap = true;
-  }
-  rpc RouteChat(stream publicx.Duh) returns (stream privatex.Meh) {}
-  rpc RouteCall(stream SearchResponse.Result) returns (stream publicx.SearchRequest.Request) {}
+  rpc DeleteTask(TaskId) returns (ReturnStatus) {}
+  rpc RouteChat(TaskId) returns (stream ReturnStatus) {}
+}
+
+service AuditTask {
+  rpc AuditTask (Task) returns (TaskId) {}
 }
 
 // Id of the Task...
 message TaskId {
-  option message_set_wire_format = true;
-  string id = 1;
+  required string id = 1;
 }
 
 // Task object...
 message Task {
-  string name = 1;
-  string id = 2;
-  string desc = 3;
-  string priority = 4 [deprecated=true,default="p1"];
-  string for = 5;
-  string on = 6;
-  string starting = 7;
-  string remind = 8 [deprecated=true];
-  string location = 9 [default="mars"];
+  required string name = 1;
+  required string id = 2;
+  optional string desc = 3;
+  required string priority = 4;
+  required string for = 5;
+  required string on = 6;
+  required string starting = 7;
+  required string remind = 8;
+  required string location = 9;
   repeated string tags = 10;  
   repeated string comments = 11;
-  // fizzed
   oneof fizzbuzz {
-    option zzz = true;
     string fizz = 12;
     int32 buzz = 13;
   }  
-}
-
-extend Task {
-  int32 bar = 126;
 }
 
 // List of tasks...
@@ -62,40 +51,46 @@ message TaskList {
 
 // Options to pass in a params for listing tasks...
 message TaskListOptions {
-  string status = 1;
-  string for = 2;
-  extensions 1000 to max;
+  required string status = 1;
+  required string for = 2;
+  extensions 500 to 600;
+}
+
+extend TaskListOptions {
+  optional int32 bar = 510;
 }
 
 // Options to pass in for updating a task...
 message TaskUpdateOptions {
-  TaskId taskId = 1;
-  Task task = 2;
-  reserved 10, 12, 9 to 11;
+  required TaskId taskId = 1;
+  required Task task = 2;
+  reserved 13, 12, 9 to 11;
 }
 
 // Return status of delete and update task operations...
 message ReturnStatus {
-  bool success = 1;
-  string message = 2;
-  publicx.StatusEnum status = 3;  
-  //Drama drama = 4;  
+  required bool success = 1;
+  optional string message = 2;
   reserved "foo", "bar";
 }
 
 message SearchResponse {
   message Result {
     required string url = 1;
-    string title = 2;
+    required string title = 2;
     repeated string snippets = 3;
   }
   repeated Result result = 1;
   map<string, ReturnStatus> statusmap = 2;
 }
 
+//extend SearchResponse {
+//  map<string, ReturnStatus> statusmap = 310;
+//}
+
 // EnumAllowingAlias docs for testing...
 enum EnumAllowingAlias {
-  UNKNOWN = 0;  //abcd
+  UNKNOWN = 0;
   STARTED = 1;
   RUNNING = 2;
 }
