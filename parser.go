@@ -365,6 +365,8 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 			"are 'optional' by default.")
 	} else if label == "required" && pf.Syntax == "proto3" {
 		return p.errline("Required fields are not allowed in proto3")
+	} else if label == "required" && ctx.ctxType == extendCtx {
+		return p.errline("Message extensions cannot have required fields")
 	}
 
 	// the field struct...
