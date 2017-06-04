@@ -136,7 +136,7 @@ func fields(fields []pbparser.FieldElement, tab string) {
 		if f.Label != "" {
 			fmt.Println(tab + "Label: " + f.Label)
 		}
-		fmt.Printf("%vType: %v\n", tab, f.Type)
+		fmt.Printf("%vType: %v\n", tab, f.Type.Name())
 		fmt.Printf("%vTag: %v\n", tab, f.Tag)
 		doc(f.Documentation, tab)
 		options(f.Options, tab+tab)

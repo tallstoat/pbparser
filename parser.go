@@ -390,6 +390,26 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		return err
 	}
 
+	// perform checks for map data type...
+	if fe.Type.Category() == MapDataTypeCategory {
+		if fe.Label == "repeated" || fe.Label == "required" || fe.Label == "optional" {
+			return errors.New("Label " + fe.Label + " is not allowed on map fields")
+		}
+		if ctx.ctxType == oneOfCtx {
+			return errors.New("Map fields are not allowed in oneofs")
+		}
+		if ctx.ctxType == extendCtx {
+			return errors.New("Map fields are not allowed to be extensions")
+		}
+		mdt := fe.Type.(MapDataType)
+		if mdt.keyType.Name() == "float" || mdt.keyType.Name() == "double" || mdt.keyType.Name() == "bytes" {
+			return errors.New("Key in map fields cannot be float/double or bytes")
+		}
+		if mdt.keyType.Category() == NamedDataTypeCategory {
+			return errors.New("Key in map fields cannot be named types")
+		}
+	}
+
 	// figure out the name
 	p.skipWhitespace()
 	if fe.Name, _, err = p.readName(); err != nil {
@@ -900,6 +920,7 @@ func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 		if c := p.read(); c != ',' {
 			return nil, p.throw(',', c)
 		}
+		p.skipWhitespace()
 		valueType, err = p.readDataType()
 		if err != nil {
 			return nil, err
