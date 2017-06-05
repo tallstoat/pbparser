@@ -41,7 +41,7 @@ func TestParseFile(t *testing.T) {
 		options(pf.Options, "")
 
 		for _, m := range pf.Messages {
-			printMessage(&m)
+			printMessage(&m, "")
 		}
 
 		for _, ed := range pf.ExtendDeclarations {
@@ -67,31 +67,34 @@ func TestParseFile(t *testing.T) {
 	}
 }
 
-func printMessage(m *pbparser.MessageElement) {
-	fmt.Println("Message: " + m.Name)
-	fmt.Println("QualifiedName: " + m.QualifiedName)
-	doc(m.Documentation, "")
-	options(m.Options, "")
-	fields(m.Fields, tab)
+func printMessage(m *pbparser.MessageElement, prefix string) {
+	fmt.Println(prefix + "Message: " + m.Name)
+	fmt.Println(prefix + "QualifiedName: " + m.QualifiedName)
+	doc(m.Documentation, prefix)
+	options(m.Options, prefix)
+	fields(m.Fields, prefix+tab)
 	for _, oo := range m.OneOfs {
-		fmt.Println(tab + "OneOff: " + oo.Name)
-		doc(oo.Documentation, tab)
-		options(oo.Options, tab)
-		fields(oo.Fields, tab2)
+		fmt.Println(prefix + tab + "OneOff: " + oo.Name)
+		doc(oo.Documentation, prefix+tab)
+		options(oo.Options, prefix+tab)
+		fields(oo.Fields, prefix+tab2)
 	}
 	for _, xe := range m.Extensions {
-		fmt.Printf("%vExtensions:: Start: %v End: %v\n", tab, xe.Start, xe.End)
-		doc(xe.Documentation, tab)
+		fmt.Printf("%vExtensions:: Start: %v End: %v\n", prefix+tab, xe.Start, xe.End)
+		doc(xe.Documentation, prefix+tab)
 	}
 	for _, rn := range m.ReservedNames {
-		fmt.Println(tab + "Reserved Name: " + rn)
+		fmt.Println(prefix + tab + "Reserved Name: " + rn)
 	}
 	for _, rr := range m.ReservedRanges {
-		fmt.Printf("%vReserved Range:: Start: %v to End: %v\n", tab, rr.Start, rr.End)
-		doc(rr.Documentation, tab)
+		fmt.Printf("%vReserved Range:: Start: %v to End: %v\n", prefix+tab, rr.Start, rr.End)
+		doc(rr.Documentation, prefix+tab)
 	}
 	for _, en := range m.Enums {
-		printEnum(&en, tab)
+		printEnum(&en, prefix+tab)
+	}
+	for _, nestedMsg := range m.Messages {
+		printMessage(&nestedMsg, prefix+tab)
 	}
 }
 

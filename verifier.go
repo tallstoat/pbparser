@@ -220,6 +220,14 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 		// Check messages
 		found, _ = checkMsgName(f.category, msgs)
 
+		// Check in nested messages
+		if !found {
+			foundMsg, msg := checkMsgName(f.msg, msgs)
+			if foundMsg {
+				found, _ = checkMsgName(f.category, msg.Messages)
+			}
+		}
+
 		// Check in nested enums
 		if !found {
 			foundMsg, msg := checkMsgName(f.msg, msgs)
@@ -248,6 +256,14 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 		if inSamePkg {
 			// Check against normal as well as nested types in same pacakge
 			found = checkMsgQualifiedName(mainpkg+"."+datatype.Name(), msgs)
+			if !found {
+				for _, msg := range msgs {
+					found = checkMsgQualifiedName(mainpkg+"."+datatype.Name(), msg.Messages)
+					if found {
+						break
+					}
+				}
+			}
 		} else {
 			dpf, ok := m[pkgName]
 			if !ok {
@@ -257,6 +273,14 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 			}
 			// Check against normal as well as nested fields in dependency pacakge
 			found = checkMsgQualifiedName(datatype.Name(), dpf.Messages)
+			if !found {
+				for _, msg := range dpf.Messages {
+					found = checkMsgQualifiedName(datatype.Name(), msg.Messages)
+					if found {
+						break
+					}
+				}
+			}
 		}
 	} else {
 		found, _ = checkMsgName(datatype.Name(), msgs)

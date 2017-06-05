@@ -91,3 +91,8 @@ func (pc parseCtx) permitsOneOf() bool {
 func (pc parseCtx) permitsEnum() bool {
 	return pc.ctxType == fileCtx || pc.ctxType == msgCtx
 }
+
+// does this ctx permit msg support?
+func (pc parseCtx) permitsMsg() bool {
+	return pc.ctxType == fileCtx || pc.ctxType == msgCtx
+}

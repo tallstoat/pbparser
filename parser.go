@@ -189,7 +189,10 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 			return err
 		}
 	} else if label == "message" {
-		if err := p.readMessage(pf, documentation); err != nil {
+		if !ctx.permitsMsg() {
+			return p.unexpected(label, ctx)
+		}
+		if err := p.readMessage(pf, documentation, ctx); err != nil {
 			return err
 		}
 	} else if label == "enum" {
@@ -540,7 +543,7 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 	return nil
 }
 
-func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
+func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
 	if err != nil {
@@ -566,12 +569,18 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string) error {
 		return p.throw('{', c)
 	}
 
-	ctx := parseCtx{ctxType: msgCtx, obj: &me}
-	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
+	innerCtx := parseCtx{ctxType: msgCtx, obj: &me}
+	if err = p.readDeclarationsInLoop(pf, innerCtx); err != nil {
 		return err
 	}
 
-	pf.Messages = append(pf.Messages, me)
+	// add msg to the proper parent...
+	if ctx.ctxType == msgCtx {
+		parent := ctx.obj.(*MessageElement)
+		parent.Messages = append(parent.Messages, me)
+	} else {
+		pf.Messages = append(pf.Messages, me)
+	}
 	return nil
 }
 
@@ -798,8 +807,8 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string, ctx parseCtx) err
 	}
 
 	ee := EnumElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
-	innerctx := parseCtx{ctxType: enumCtx, obj: &ee}
-	if err = p.readDeclarationsInLoop(pf, innerctx); err != nil {
+	innerCtx := parseCtx{ctxType: enumCtx, obj: &ee}
+	if err = p.readDeclarationsInLoop(pf, innerCtx); err != nil {
 		return err
 	}
 
