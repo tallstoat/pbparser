@@ -193,7 +193,10 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 			return err
 		}
 	} else if label == "enum" {
-		if err := p.readEnum(pf, documentation); err != nil {
+		if !ctx.permitsEnum() {
+			return p.unexpected(label, ctx)
+		}
+		if err := p.readEnum(pf, documentation, ctx); err != nil {
 			return err
 		}
 	} else if label == "extend" {
@@ -783,7 +786,7 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 	return nil
 }
 
-func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
+func (p *parser) readEnum(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
 	if err != nil {
@@ -795,12 +798,18 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string) error {
 	}
 
 	ee := EnumElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
-	ctx := parseCtx{ctxType: enumCtx, obj: &ee}
-	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
+	innerctx := parseCtx{ctxType: enumCtx, obj: &ee}
+	if err = p.readDeclarationsInLoop(pf, innerctx); err != nil {
 		return err
 	}
 
-	pf.Enums = append(pf.Enums, ee)
+	// add enum to the proper parent...
+	if ctx.ctxType == msgCtx {
+		me := ctx.obj.(*MessageElement)
+		me.Enums = append(me.Enums, ee)
+	} else {
+		pf.Enums = append(pf.Enums, ee)
+	}
 	return nil
 }
 

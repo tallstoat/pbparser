@@ -104,6 +104,7 @@ type MessageElement struct {
 	Options        []OptionElement
 	Fields         []FieldElement
 	Enums          []EnumElement
+	Messages       []MessageElement
 	OneOfs         []OneOfElement
 	Extensions     []ExtensionsElement
 	ReservedRanges []ReservedRangeElement

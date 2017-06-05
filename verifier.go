@@ -54,13 +54,30 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		}
 	}
 
-	// validate if enum constants are uniqie across enums in the package
-	if err := validateEnumConstants(pf); err != nil {
+	// validate that message and enum names are unique in the package
+	if err := validateUniqueMessageEnumNames("package "+pf.PackageName, pf.Enums, pf.Messages); err != nil {
+		return err
+	}
+	// validate that enum names are unique across nested messages and enums within the message
+	if err := validateUniqueMessageEnumNamesInMessage(pf); err != nil {
+		return err
+	}
+
+	// validate if enum constants are unique across enums in the package
+	if err := validateEnumConstants("package "+pf.PackageName, pf.Enums); err != nil {
+		return err
+	}
+	// validate if enum constants are unique across nested enums within the message
+	if err := validateEnumConstantsInMessage(pf); err != nil {
 		return err
 	}
 
 	// allow aliases in enums only if option allow_alias is specified
-	if err := validateEnumConstantTagAliases(pf); err != nil {
+	if err := validateEnumConstantTagAliases(pf.Enums); err != nil {
+		return err
+	}
+	// allow aliases in nested enums only if option allow_alias is specified
+	if err := validateEnumConstantTagAliasesInMessage(pf); err != nil {
 		return err
 	}
 
@@ -69,8 +86,34 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	return nil
 }
 
-func validateEnumConstantTagAliases(pf *ProtoFile) error {
-	for _, en := range pf.Enums {
+func validateUniqueMessageEnumNamesInMessage(pf *ProtoFile) error {
+	for _, msg := range pf.Messages {
+		if err := validateUniqueMessageEnumNames("message "+msg.Name, msg.Enums, msg.Messages); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateUniqueMessageEnumNames(ctxName string, enums []EnumElement, msgs []MessageElement) error {
+	m := make(map[string]bool)
+	for _, en := range enums {
+		if m[en.Name] {
+			return errors.New("Duplicate name " + en.Name + " in " + ctxName)
+		}
+		m[en.Name] = true
+	}
+	for _, msg := range msgs {
+		if m[msg.Name] {
+			return errors.New("Duplicate name " + msg.Name + " in " + ctxName)
+		}
+		m[msg.Name] = true
+	}
+	return nil
+}
+
+func validateEnumConstantTagAliases(enums []EnumElement) error {
+	for _, en := range enums {
 		m := make(map[int]bool)
 		for _, enc := range en.EnumConstants {
 			if m[enc.Tag] {
@@ -79,6 +122,15 @@ func validateEnumConstantTagAliases(pf *ProtoFile) error {
 				}
 			}
 			m[enc.Tag] = true
+		}
+	}
+	return nil
+}
+
+func validateEnumConstantTagAliasesInMessage(pf *ProtoFile) error {
+	for _, msg := range pf.Messages {
+		if err := validateEnumConstantTagAliases(msg.Enums); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -93,14 +145,23 @@ func isAllowAlias(en *EnumElement) bool {
 	return false
 }
 
-func validateEnumConstants(pf *ProtoFile) error {
+func validateEnumConstants(ctxName string, enums []EnumElement) error {
 	m := make(map[string]bool)
-	for _, en := range pf.Enums {
+	for _, en := range enums {
 		for _, enc := range en.EnumConstants {
 			if m[enc.Name] {
-				return errors.New("Enum constant " + enc.Name + " is already defined in package " + pf.PackageName)
+				return errors.New("Enum constant " + enc.Name + " is already defined in " + ctxName)
 			}
 			m[enc.Name] = true
+		}
+	}
+	return nil
+}
+
+func validateEnumConstantsInMessage(pf *ProtoFile) error {
+	for _, msg := range pf.Messages {
+		if err := validateEnumConstants("message "+msg.Name, msg.Enums); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -124,6 +185,7 @@ func getDependencyPackageNames(m map[string]ProtoFile) []string {
 type fd struct {
 	name     string
 	category string
+	msg      string
 }
 
 func findFieldsToValidate(msgs []MessageElement) []fd {
@@ -131,7 +193,7 @@ func findFieldsToValidate(msgs []MessageElement) []fd {
 	for _, msg := range msgs {
 		for _, f := range msg.Fields {
 			if f.Type.Category() == NamedDataTypeCategory {
-				fields = append(fields, fd{name: f.Name, category: f.Type.Name()})
+				fields = append(fields, fd{name: f.Name, category: f.Type.Name(), msg: msg.Name})
 			}
 		}
 	}
@@ -155,8 +217,18 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 			found = checkMsgOrEnumQualifiedName(f.category, dpf.Messages, dpf.Enums)
 		}
 	} else {
-		// Check both messages and enums
-		found = checkMsgName(f.category, msgs)
+		// Check messages
+		found, _ = checkMsgName(f.category, msgs)
+
+		// Check in nested enums
+		if !found {
+			foundMsg, msg := checkMsgName(f.msg, msgs)
+			if foundMsg {
+				found = checkEnumName(f.category, msg.Enums)
+			}
+		}
+
+		// Check enums
 		if !found {
 			found = checkEnumName(f.category, enums)
 		}
@@ -187,7 +259,7 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 			found = checkMsgQualifiedName(datatype.Name(), dpf.Messages)
 		}
 	} else {
-		found = checkMsgName(datatype.Name(), msgs)
+		found, _ = checkMsgName(datatype.Name(), msgs)
 	}
 	if !found {
 		msg := fmt.Sprintf("Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message type", datatype.Name(), rpc, service)
@@ -205,13 +277,13 @@ func isDatatypeInSamePackage(datatypeName string, packageNames []string) (bool, 
 	return true, ""
 }
 
-func checkMsgName(m string, msgs []MessageElement) bool {
+func checkMsgName(m string, msgs []MessageElement) (bool, MessageElement) {
 	for _, msg := range msgs {
 		if msg.Name == m {
-			return true
+			return true, msg
 		}
 	}
-	return false
+	return false, MessageElement{}
 }
 
 func checkEnumName(s string, enums []EnumElement) bool {

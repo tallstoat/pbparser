@@ -62,7 +62,7 @@ func TestParseFile(t *testing.T) {
 		}
 
 		for _, en := range pf.Enums {
-			printEnum(&en)
+			printEnum(&en, "")
 		}
 	}
 }
@@ -90,6 +90,9 @@ func printMessage(m *pbparser.MessageElement) {
 		fmt.Printf("%vReserved Range:: Start: %v to End: %v\n", tab, rr.Start, rr.End)
 		doc(rr.Documentation, tab)
 	}
+	for _, en := range m.Enums {
+		printEnum(&en, tab)
+	}
 }
 
 func printRPC(rpc *pbparser.RPCElement) {
@@ -108,15 +111,15 @@ func printRPC(rpc *pbparser.RPCElement) {
 	options(rpc.Options, tab)
 }
 
-func printEnum(en *pbparser.EnumElement) {
-	fmt.Println("Enum: " + en.Name)
-	fmt.Println("QualifiedName: " + en.QualifiedName)
-	doc(en.Documentation, "")
-	options(en.Options, "")
+func printEnum(en *pbparser.EnumElement, prefix string) {
+	fmt.Println(prefix + "Enum: " + en.Name)
+	fmt.Println(prefix + "QualifiedName: " + en.QualifiedName)
+	doc(en.Documentation, prefix)
+	options(en.Options, prefix)
 	for _, enc := range en.EnumConstants {
-		fmt.Printf("%vName: %v Tag: %v\n", tab, enc.Name, enc.Tag)
-		doc(enc.Documentation, tab)
-		options(enc.Options, tab2)
+		fmt.Printf("%vName: %v Tag: %v\n", prefix+tab, enc.Name, enc.Tag)
+		doc(enc.Documentation, prefix+tab)
+		options(enc.Options, prefix+tab2)
 	}
 }
 

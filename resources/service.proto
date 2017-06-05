@@ -101,6 +101,9 @@ message SearchResponse {
   }
   repeated Result result = 1;
   map<string, ReturnStatus> statusmap = 2;
+  enum EnumNotAllowingAlias {
+    UNKNOWN = 0;
+  }
 }
 
 // EnumAllowingAlias docs for testing...

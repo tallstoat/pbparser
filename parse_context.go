@@ -82,7 +82,12 @@ func (pc parseCtx) permitsRPC() bool {
 	return pc.ctxType == serviceCtx
 }
 
-// PermitsOneOf does this ctx permit OneOf support?
+// does this ctx permit OneOf support?
 func (pc parseCtx) permitsOneOf() bool {
 	return pc.ctxType == msgCtx
+}
+
+// does this ctx permit enum support?
+func (pc parseCtx) permitsEnum() bool {
+	return pc.ctxType == fileCtx || pc.ctxType == msgCtx
 }
