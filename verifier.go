@@ -59,9 +59,38 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		return err
 	}
 
+	// allow aliases in enums only if option allow_alias is specified
+	if err := validateEnumConstantTagAliases(pf); err != nil {
+		return err
+	}
+
 	// TODO: add more checks here if needed
 
 	return nil
+}
+
+func validateEnumConstantTagAliases(pf *ProtoFile) error {
+	for _, en := range pf.Enums {
+		m := make(map[int]bool)
+		for _, enc := range en.EnumConstants {
+			if m[enc.Tag] {
+				if !isAllowAlias(&en) {
+					return errors.New(enc.Name + " is reusing an enum value. If this is intended, set 'option allow_alias = true;' in the enum")
+				}
+			}
+			m[enc.Tag] = true
+		}
+	}
+	return nil
+}
+
+func isAllowAlias(en *EnumElement) bool {
+	for _, op := range en.Options {
+		if op.Name == "allow_alias" && op.Value == "true" {
+			return true
+		}
+	}
+	return false
 }
 
 func validateEnumConstants(pf *ProtoFile) error {
