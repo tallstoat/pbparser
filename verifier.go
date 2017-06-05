@@ -54,8 +54,26 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		}
 	}
 
+	// validate if enum constants are uniqie across enums in the package
+	if err := validateEnumConstants(pf); err != nil {
+		return err
+	}
+
 	// TODO: add more checks here if needed
 
+	return nil
+}
+
+func validateEnumConstants(pf *ProtoFile) error {
+	m := make(map[string]bool)
+	for _, en := range pf.Enums {
+		for _, enc := range en.EnumConstants {
+			if m[enc.Name] {
+				return errors.New("Enum constant " + enc.Name + " is already defined in package " + pf.PackageName)
+			}
+			m[enc.Name] = true
+		}
+	}
 	return nil
 }
 
