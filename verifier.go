@@ -54,12 +54,8 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		}
 	}
 
-	// validate that message and enum names are unique in the package
+	// validate that message and enum names are unique in the package & well as at the nested msg level (howsoever deep)
 	if err := validateUniqueMessageEnumNames("package "+pf.PackageName, pf.Enums, pf.Messages); err != nil {
-		return err
-	}
-	// validate that enum names are unique across nested messages and enums within the message
-	if err := validateUniqueMessageEnumNamesInMessage(pf); err != nil {
 		return err
 	}
 
@@ -67,9 +63,11 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	if err := validateEnumConstants("package "+pf.PackageName, pf.Enums); err != nil {
 		return err
 	}
-	// validate if enum constants are unique across nested enums within the message
-	if err := validateEnumConstantsInMessage(pf); err != nil {
-		return err
+	// validate if enum constants are unique across nested enums within nested messages (howsoever deep)
+	for _, msg := range pf.Messages {
+		if err := validateEnumConstantsInMessage(msg); err != nil {
+			return err
+		}
 	}
 
 	// allow aliases in enums only if option allow_alias is specified
@@ -86,15 +84,6 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	return nil
 }
 
-func validateUniqueMessageEnumNamesInMessage(pf *ProtoFile) error {
-	for _, msg := range pf.Messages {
-		if err := validateUniqueMessageEnumNames("message "+msg.Name, msg.Enums, msg.Messages); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func validateUniqueMessageEnumNames(ctxName string, enums []EnumElement, msgs []MessageElement) error {
 	m := make(map[string]bool)
 	for _, en := range enums {
@@ -108,6 +97,11 @@ func validateUniqueMessageEnumNames(ctxName string, enums []EnumElement, msgs []
 			return errors.New("Duplicate name " + msg.Name + " in " + ctxName)
 		}
 		m[msg.Name] = true
+	}
+	for _, msg := range msgs {
+		if err := validateUniqueMessageEnumNames("message "+msg.Name, msg.Enums, msg.Messages); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -158,9 +152,12 @@ func validateEnumConstants(ctxName string, enums []EnumElement) error {
 	return nil
 }
 
-func validateEnumConstantsInMessage(pf *ProtoFile) error {
-	for _, msg := range pf.Messages {
-		if err := validateEnumConstants("message "+msg.Name, msg.Enums); err != nil {
+func validateEnumConstantsInMessage(msg MessageElement) error {
+	if err := validateEnumConstants("message "+msg.Name, msg.Enums); err != nil {
+		return err
+	}
+	for _, nestedmsg := range msg.Messages {
+		if err := validateEnumConstantsInMessage(nestedmsg); err != nil {
 			return err
 		}
 	}
