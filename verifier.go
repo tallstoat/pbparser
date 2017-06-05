@@ -74,9 +74,11 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	if err := validateEnumConstantTagAliases(pf.Enums); err != nil {
 		return err
 	}
-	// allow aliases in nested enums only if option allow_alias is specified
-	if err := validateEnumConstantTagAliasesInMessage(pf); err != nil {
-		return err
+	// allow aliases in nested enums within nested messages (howsoever deep) only if option allow_alias is specified
+	for _, msg := range pf.Messages {
+		if err := validateEnumConstantTagAliasesInMessage(msg); err != nil {
+			return err
+		}
 	}
 
 	// TODO: add more checks here if needed
@@ -121,9 +123,12 @@ func validateEnumConstantTagAliases(enums []EnumElement) error {
 	return nil
 }
 
-func validateEnumConstantTagAliasesInMessage(pf *ProtoFile) error {
-	for _, msg := range pf.Messages {
-		if err := validateEnumConstantTagAliases(msg.Enums); err != nil {
+func validateEnumConstantTagAliasesInMessage(msg MessageElement) error {
+	if err := validateEnumConstantTagAliases(msg.Enums); err != nil {
+		return err
+	}
+	for _, nestedmsg := range msg.Messages {
+		if err := validateEnumConstantTagAliasesInMessage(nestedmsg); err != nil {
 			return err
 		}
 	}

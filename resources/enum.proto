@@ -27,7 +27,9 @@ message Outer {
       message Deep { 
         int32 xval = 1;
         enum Dowop {
+          option allow_alias = true;
           UNKNOWN = 0;
+          STARTING = 0;
         }
         enum Dowop2 {
           UNKNOWN2 = 0;
