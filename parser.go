@@ -365,13 +365,13 @@ func (p *parser) readReservedNames(documentation string, me *MessageElement) err
 }
 
 func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
-	if label == "optional" && pf.Syntax == "proto3" {
+	if label == optional && pf.Syntax == proto3 {
 		return p.errline("Explicit 'optional' labels are disallowed in the Proto3 syntax. " +
 			"To define 'optional' fields in Proto3, simply remove the 'optional' label, as fields " +
 			"are 'optional' by default.")
-	} else if label == "required" && pf.Syntax == "proto3" {
+	} else if label == required && pf.Syntax == proto3 {
 		return p.errline("Required fields are not allowed in proto3")
-	} else if label == "required" && ctx.ctxType == extendCtx {
+	} else if label == required && ctx.ctxType == extendCtx {
 		return p.errline("Message extensions cannot have required fields")
 	}
 
@@ -381,7 +381,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	// figure out dataTypeStr based on the label...
 	var err error
 	dataTypeStr := label
-	if label == "required" || label == "optional" || label == "repeated" {
+	if label == required || label == optional || label == repeated {
 		if ctx.ctxType == oneOfCtx {
 			return p.errline("Label '%v' is disallowd in oneoff field", label)
 		}
@@ -397,7 +397,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 
 	// perform checks for map data type...
 	if fe.Type.Category() == MapDataTypeCategory {
-		if fe.Label == "repeated" || fe.Label == "required" || fe.Label == "optional" {
+		if fe.Label == repeated || fe.Label == required || fe.Label == optional {
 			return p.errline("Label %v is not allowed on map fields", fe.Label)
 		}
 		if ctx.ctxType == oneOfCtx {
@@ -585,7 +585,7 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) 
 }
 
 func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCtx) error {
-	if pf.Syntax == "proto3" {
+	if pf.Syntax == proto3 {
 		return p.errline("Extension ranges are not allowed in proto3")
 	}
 
@@ -865,7 +865,7 @@ func (p *parser) readSyntax(pf *ProtoFile) error {
 	if err != nil {
 		return err
 	}
-	if syntax != "proto2" && syntax != "proto3" {
+	if syntax != "proto2" && syntax != proto3 {
 		return p.errline("'syntax' must be 'proto2' or 'proto3'. Found: %v", syntax)
 	}
 	if c := p.read(); c != ';' {
@@ -1217,4 +1217,12 @@ const (
 	parenthesis enclosure = iota
 	bracket
 	unenclosed
+)
+
+// some often-used string constants
+const (
+	proto3   = "proto3"
+	optional = "optional"
+	required = "required"
+	repeated = "repeated"
 )
