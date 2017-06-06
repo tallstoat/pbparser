@@ -264,7 +264,7 @@ func (p *parser) readDeclarationsInLoop(pf *ProtoFile, ctx parseCtx) error {
 		}
 		p.skipWhitespace()
 		if p.eofReached {
-			break
+			return fmt.Errorf("Reached end of input in %v definition (missing '}')\n", ctx)
 		}
 		if c := p.read(); c == '}' {
 			break
