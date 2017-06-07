@@ -1,0 +1,27 @@
+syntax = "proto3";
+package missing;
+
+message Outer {        
+  message MiddleAA {  
+    message Inner {   
+      int64 ival = 1;
+      bool booly = 2;
+    }
+  }
+  message MiddleBB {  
+    message Inner { 
+      int32 ival = 1;
+      bool booly = 2;
+      message Deep { 
+        int32 xval = 1;
+        enum Dowop {
+          option allow_alias = true;
+          UNKNOWN = 0;
+          STARTING = 0;
+        }
+        enum Dowop2 {
+          UNKNOWN2 = 0;
+        }
+      }
+    }
+  }

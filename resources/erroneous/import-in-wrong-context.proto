@@ -1,0 +1,7 @@
+syntax = "proto3";
+package missing;
+
+message Task {
+  import "abcd.proto"
+  string id = 1;
+}
