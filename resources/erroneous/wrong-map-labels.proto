@@ -1,0 +1,7 @@
+syntax = "proto2";
+package missing;
+
+message Task {
+  string id = 1;
+  required map<string, Task> taskmap = 2;
+}

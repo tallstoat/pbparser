@@ -1,0 +1,12 @@
+syntax = "proto3";
+package missing;
+
+message Task {
+  string id = 1;
+  oneof fizzbuzz {
+    option zzz = true;
+    string fizz = 12;
+    repeated int32 buzz = 13;
+  }  
+}
+

@@ -1,0 +1,9 @@
+syntax = "proto3";
+package missing;
+
+service TaskMaster {
+  oneof State {
+    int32 errcode = 128;
+    string errmsg = 129;
+  }
+}

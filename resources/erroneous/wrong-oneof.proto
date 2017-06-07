@@ -1,0 +1,9 @@
+syntax = "proto3";
+package missing;
+
+message Task {
+  string id = 1;
+  oneof fizzbuzz 
+    string fizz = 12;
+  } 
+}

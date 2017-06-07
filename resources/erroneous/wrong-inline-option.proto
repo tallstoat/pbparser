@@ -1,0 +1,7 @@
+syntax = "proto3";
+package missing;
+
+enum EnumAllowingAlias {
+  UNKNOWN = 0;
+  STARTED = 1 [gah > 0];
+}

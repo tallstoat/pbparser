@@ -1,0 +1,7 @@
+syntax = "proto3";
+package missing;
+
+message TaskListOptions {
+  string status = 1;
+  required string for = 2;
+}

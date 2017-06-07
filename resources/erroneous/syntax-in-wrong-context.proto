@@ -1,0 +1,6 @@
+package missing;
+
+message Task {
+  syntax = "proto3";
+  string id = 1;
+}

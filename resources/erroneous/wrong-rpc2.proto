@@ -1,0 +1,12 @@
+syntax = "proto3";
+package missing
+
+message Task {
+  string id = 1;
+}
+
+service TaskMaster {
+  rpc Add (Task) returns (TaskId);
+  rpc Get (TaskId) returns (Task)
+}
+

@@ -1,0 +1,14 @@
+syntax = "proto3";
+package missing;
+
+import private "duh/abcd.proto";
+
+message Task {
+  string id = 1;
+  TaskDesc desc = 2;
+  abcd.TaskDetails details = 3;
+}
+
+message TaskDesc {
+  string desc = 1;
+}
