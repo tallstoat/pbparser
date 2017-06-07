@@ -18,6 +18,11 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		return err
 	}
 
+	// validate package
+	if err := validatePackage(pf); err != nil {
+		return err
+	}
+
 	if (len(pf.Dependencies) > 0 || len(pf.PublicDependencies) > 0) && p == nil {
 		return errors.New("ImportModuleProvider is required to validate imports")
 	}
@@ -187,6 +192,13 @@ func validateSyntax(pf *ProtoFile) error {
 	return nil
 }
 
+func validatePackage(pf *ProtoFile) error {
+	if pf.PackageName == "" {
+		return errors.New("No package specified in the proto file")
+	}
+	return nil
+}
+
 func getDependencyPackageNames(m map[string]protoFileOracle) []string {
 	var keys []string
 	for k := range m {
@@ -249,10 +261,7 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 				found = orcl.enummap[mainpkg+"."+f.category]
 			}
 		} else {
-			orcl, ok := m[pkgName]
-			if !ok {
-				return fmt.Errorf("Package '%v' of Datatype: '%v' referenced in field: '%v' is not defined", pkgName, f.category, f.name)
-			}
+			orcl := m[pkgName]
 			// Check against normal and nested messages & enums in dependency pacakge
 			found = orcl.msgmap[f.category]
 			if !found {
@@ -283,11 +292,7 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 			orcl := m[mainpkg]
 			found = orcl.msgmap[mainpkg+"."+datatype.Name()]
 		} else {
-			orcl, ok := m[pkgName]
-			if !ok {
-				return fmt.Errorf("Package '%v' of Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message type",
-					pkgName, datatype.Name(), rpc, service)
-			}
+			orcl := m[pkgName]
 			// Check against normal and nested messages & enums in dependency pacakge
 			found = orcl.msgmap[datatype.Name()]
 		}
@@ -353,7 +358,13 @@ func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[s
 			return errors.New(msg)
 		}
 
+		// validate syntax
 		if err := validateSyntax(&dpf); err != nil {
+			return err
+		}
+
+		// validate package
+		if err := validatePackage(&dpf); err != nil {
 			return err
 		}
 
