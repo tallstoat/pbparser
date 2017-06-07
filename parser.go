@@ -171,88 +171,62 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		if !ctx.permitsSyntax() {
 			return p.unexpected(label, ctx)
 		}
-		if err := p.readSyntax(pf); err != nil {
-			return err
-		}
+		return p.readSyntax(pf)
 	} else if label == "import" {
 		if !ctx.permitsImport() {
 			return p.unexpected(label, ctx)
 		}
-		if err := p.readImport(pf); err != nil {
-			return err
-		}
+		return p.readImport(pf)
 	} else if label == "option" {
 		if !ctx.permitsOption() {
 			return p.unexpected(label, ctx)
 		}
-		if err := p.readOption(pf, documentation, ctx); err != nil {
-			return err
-		}
+		return p.readOption(pf, documentation, ctx)
 	} else if label == "message" {
 		if !ctx.permitsMsg() {
 			return p.unexpected(label, ctx)
 		}
-		if err := p.readMessage(pf, documentation, ctx); err != nil {
-			return err
-		}
+		return p.readMessage(pf, documentation, ctx)
 	} else if label == "enum" {
 		if !ctx.permitsEnum() {
 			return p.unexpected(label, ctx)
 		}
-		if err := p.readEnum(pf, documentation, ctx); err != nil {
-			return err
-		}
+		return p.readEnum(pf, documentation, ctx)
 	} else if label == "extend" {
 		if !ctx.permitsExtend() {
 			return p.unexpected(label, ctx)
 		}
-		if err := p.readExtend(pf, documentation, ctx); err != nil {
-			return err
-		}
+		return p.readExtend(pf, documentation, ctx)
 	} else if label == "service" {
-		if err := p.readService(pf, documentation); err != nil {
-			return err
-		}
+		return p.readService(pf, documentation)
 	} else if label == "rpc" {
 		if !ctx.permitsRPC() {
 			return p.unexpected(label, ctx)
 		}
 		se := ctx.obj.(*ServiceElement)
-		if err := p.readRPC(pf, se, documentation); err != nil {
-			return err
-		}
+		return p.readRPC(pf, se, documentation)
 	} else if label == "oneof" {
 		if !ctx.permitsOneOf() {
 			return p.unexpected(label, ctx)
 		}
-		if err := p.readOneOf(pf, documentation, ctx); err != nil {
-			return err
-		}
+		return p.readOneOf(pf, documentation, ctx)
 	} else if label == "extensions" {
 		if !ctx.permitsExtensions() {
 			return p.unexpected(label, ctx)
 		}
-		if err := p.readExtensions(pf, documentation, ctx); err != nil {
-			return err
-		}
+		return p.readExtensions(pf, documentation, ctx)
 	} else if label == "reserved" {
 		if !ctx.permitsReserved() {
 			return p.unexpected(label, ctx)
 		}
-		if err := p.readReserved(pf, documentation, ctx); err != nil {
-			return err
-		}
+		return p.readReserved(pf, documentation, ctx)
 	} else if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx || ctx.ctxType == oneOfCtx {
 		if !ctx.permitsField() {
 			return p.errline("fields must be nested")
 		}
-		if err := p.readField(pf, label, documentation, ctx); err != nil {
-			return err
-		}
+		return p.readField(pf, label, documentation, ctx)
 	} else if ctx.ctxType == enumCtx {
-		if err := p.readEnumConstant(pf, label, documentation, ctx); err != nil {
-			return err
-		}
+		return p.readEnumConstant(pf, label, documentation, ctx)
 	} else if label != "" {
 		return p.unexpected(label, ctx)
 	}
@@ -369,8 +343,8 @@ func (p *parser) readReservedNames(documentation string, me *MessageElement) err
 
 func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
 	if label == optional && pf.Syntax == proto3 {
-		return p.errline("Explicit 'optional' labels are disallowed in the Proto3 syntax. " +
-			"To define 'optional' fields in Proto3, simply remove the 'optional' label, as fields " +
+		return p.errline("Explicit 'optional' labels are disallowed in the proto3 syntax. " +
+			"To define 'optional' fields in proto3, simply remove the 'optional' label, as fields " +
 			"are 'optional' by default.")
 	} else if label == required && pf.Syntax == proto3 {
 		return p.errline("Required fields are not allowed in proto3")
@@ -386,7 +360,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	dataTypeStr := label
 	if label == required || label == optional || label == repeated {
 		if ctx.ctxType == oneOfCtx {
-			return p.errline("Label '%v' is disallowd in oneoff field", label)
+			return p.errline("Label '%v' is disallowed in oneoff field", label)
 		}
 		fe.Label = label
 		p.skipWhitespace()
@@ -414,7 +388,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 			return p.errline("Key in map fields cannot be float, double or bytes")
 		}
 		if mdt.keyType.Category() == NamedDataTypeCategory {
-			return p.errline("Key in map fields cannot be named types")
+			return p.errline("Key in map fields cannot be a named type")
 		}
 	}
 
@@ -638,7 +612,7 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 	ec := EnumConstantElement{Name: label, Documentation: documentation}
 
 	if ec.Tag, err = p.readInt(); err != nil {
-		return p.errline("Encountered '%v' while reading tag for Enum Constant", err.Error())
+		return p.errline("Unable to read tag for Enum Constant: %v due to: %v", label, err.Error())
 	}
 
 	// If semicolon is next; we are done. If '[' is next, we must parse options for the enum constant
