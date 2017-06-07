@@ -93,6 +93,12 @@ func printMessage(m *pbparser.MessageElement, prefix string) {
 	for _, en := range m.Enums {
 		printEnum(&en, prefix+tab)
 	}
+	for _, ed := range m.ExtendDeclarations {
+		fmt.Println(prefix + "Extend: " + ed.Name)
+		fmt.Println(prefix + "QualifiedName: " + ed.QualifiedName)
+		doc(ed.Documentation, prefix)
+		fields(ed.Fields, prefix+tab)
+	}
 	for _, nestedMsg := range m.Messages {
 		printMessage(&nestedMsg, prefix+tab)
 	}

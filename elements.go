@@ -98,17 +98,18 @@ type ReservedRangeElement struct {
 // MessageElement is a datastructure which models
 // the message construct in a protobuf file.
 type MessageElement struct {
-	Name           string
-	QualifiedName  string
-	Documentation  string
-	Options        []OptionElement
-	Fields         []FieldElement
-	Enums          []EnumElement
-	Messages       []MessageElement
-	OneOfs         []OneOfElement
-	Extensions     []ExtensionsElement
-	ReservedRanges []ReservedRangeElement
-	ReservedNames  []string
+	Name               string
+	QualifiedName      string
+	Documentation      string
+	Options            []OptionElement
+	Fields             []FieldElement
+	Enums              []EnumElement
+	Messages           []MessageElement
+	OneOfs             []OneOfElement
+	ExtendDeclarations []ExtendElement
+	Extensions         []ExtensionsElement
+	ReservedRanges     []ReservedRangeElement
+	ReservedNames      []string
 }
 
 // ExtendElement is a datastructure which models

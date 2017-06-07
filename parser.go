@@ -203,7 +203,10 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 			return err
 		}
 	} else if label == "extend" {
-		if err := p.readExtend(pf, documentation); err != nil {
+		if !ctx.permitsExtend() {
+			return p.unexpected(label, ctx)
+		}
+		if err := p.readExtend(pf, documentation, ctx); err != nil {
 			return err
 		}
 	} else if label == "service" {
@@ -672,7 +675,7 @@ func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) er
 	return nil
 }
 
-func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
+func (p *parser) readExtend(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
 	if err != nil {
@@ -689,12 +692,18 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string) error {
 		return p.throw('{', c)
 	}
 
-	ctx := parseCtx{ctxType: extendCtx, obj: &ee}
-	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
+	innerCtx := parseCtx{ctxType: extendCtx, obj: &ee}
+	if err = p.readDeclarationsInLoop(pf, innerCtx); err != nil {
 		return err
 	}
 
-	pf.ExtendDeclarations = append(pf.ExtendDeclarations, ee)
+	// add extend declaration to the proper parent...
+	if ctx.ctxType == msgCtx {
+		me := ctx.obj.(*MessageElement)
+		me.ExtendDeclarations = append(me.ExtendDeclarations, ee)
+	} else {
+		pf.ExtendDeclarations = append(pf.ExtendDeclarations, ee)
+	}
 	return nil
 }
 

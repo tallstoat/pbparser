@@ -69,6 +69,9 @@ extend Task {
 // List of tasks...
 message TaskList {
   repeated Task tasks = 1;
+  extend Task {
+    optional int32 barone = 127;
+  }  
 }
 
 // Options to pass in a params for listing tasks...

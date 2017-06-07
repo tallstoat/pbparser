@@ -72,6 +72,11 @@ func (pc parseCtx) permitsExtensions() bool {
 	return pc.ctxType == msgCtx
 }
 
+// does this ctx permit extend declarations?
+func (pc parseCtx) permitsExtend() bool {
+	return pc.ctxType == fileCtx || pc.ctxType == msgCtx
+}
+
 // does this ctx permit reserved keyword support?
 func (pc parseCtx) permitsReserved() bool {
 	return pc.ctxType == msgCtx
