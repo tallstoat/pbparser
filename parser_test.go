@@ -2,14 +2,82 @@ package pbparser_test
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/tallstoat/pbparser"
 )
 
-// init the tabs...
-var tab = indent(2)
-var tab2 = indent(4)
+const (
+	resourceDir string = "./resources/erroneous/"
+)
+
+func TestParseErrors(t *testing.T) {
+	var tests = []struct {
+		file           string
+		expectedErrors []string
+	}{
+		{file: "missing-bracket-enum.proto", expectedErrors: []string{"Reached end of input in enum", "missing '}'"}},
+		{file: "missing-bracket-msg.proto", expectedErrors: []string{"Reached end of input in message", "missing '}'"}},
+		{file: "no-syntax.proto", expectedErrors: []string{"No syntax specified"}},
+		{file: "wrong-syntax.proto", expectedErrors: []string{"'syntax' must be 'proto2' or 'proto3'"}},
+		{file: "wrong-syntax2.proto", expectedErrors: []string{"Expected ';'"}},
+		{file: "wrong-syntax3.proto", expectedErrors: []string{"Expected '='"}},
+		{file: "no-package.proto", expectedErrors: []string{"No package specified"}},
+		{file: "optional-in-proto3.proto", expectedErrors: []string{"Explicit 'optional' labels are disallowed in the proto3 syntax"}},
+		{file: "required-in-proto3.proto", expectedErrors: []string{"Required fields are not allowed in proto3"}},
+		{file: "rpc-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'rpc' in context"}},
+		{file: "dup-enum.proto", expectedErrors: []string{"Duplicate name"}},
+		{file: "dup-enum-constant.proto", expectedErrors: []string{"Enum constant", "is already defined in package missing"}},
+		{file: "enum-constant-same-tag.proto", expectedErrors: []string{"is reusing an enum value. If this is intended, set 'option allow_alias = true;'"}},
+		{file: "wrong-enum-constant-tag.proto", expectedErrors: []string{"Unable to read tag for Enum Constant: UNKNOWN"}},
+		{file: "wrong-msg.proto", expectedErrors: []string{"Expected '{'"}},
+		{file: "dup-msg.proto", expectedErrors: []string{"Duplicate name"}},
+		{file: "dup-nested-msg.proto", expectedErrors: []string{"Duplicate name"}},
+		{file: "missing-msg.proto", expectedErrors: []string{"Datatype: 'TaskDetails' referenced in field: 'details' is not defined"}},
+		{file: "missing-package.proto", expectedErrors: []string{"Datatype: 'abcd.TaskDetails' referenced in field: 'details' is not defined"}},
+		{file: "wrong-import.proto", expectedErrors: []string{"ImportModuleReader is unable to provide content of dependency module"}},
+		{file: "wrong-import2.proto", expectedErrors: []string{"Expected 'public'"}},
+		{file: "wrong-import3.proto", expectedErrors: []string{"Expected '\"'"}},
+		{file: "wrong-public-import.proto", expectedErrors: []string{"ImportModuleReader is unable to provide content of dependency module"}},
+		{file: "wrong-rpc-datatype.proto", expectedErrors: []string{"Datatype: 'TaskId' referenced in RPC: 'AddTask' of Service: 'LogTask' is not defined"}},
+		{file: "wrong-label-in-oneof-field.proto", expectedErrors: []string{"Label 'repeated' is disallowed in oneoff field"}},
+		{file: "wrong-map-labels.proto", expectedErrors: []string{"Label required is not allowed on map fields"}},
+		{file: "wrong-map-declaration.proto", expectedErrors: []string{"Expected ',', but found: '>'"}},
+		{file: "wrong-map-in-oneof.proto", expectedErrors: []string{"Map fields are not allowed in oneofs"}},
+		{file: "wrong-map-key.proto", expectedErrors: []string{"Key in map fields cannot be float, double or bytes"}},
+		{file: "wrong-map-key2.proto", expectedErrors: []string{"Key in map fields cannot be a named type"}},
+		{file: "wrong-field.proto", expectedErrors: []string{"Expected '=', but found: '!'"}},
+		{file: "wrong-option.proto", expectedErrors: []string{"Expected '=', but found: '!'"}},
+		{file: "wrong-option2.proto", expectedErrors: []string{"Expected ';'"}},
+		{file: "wrong-inline-option.proto", expectedErrors: []string{"Option", "is not specified as expected"}},
+		{file: "wrong-oneof.proto", expectedErrors: []string{"Expected '{'"}},
+		{file: "wrong-extend.proto", expectedErrors: []string{"Expected '{'"}},
+		{file: "wrong-service.proto", expectedErrors: []string{"Expected '{'"}},
+		{file: "wrong-rpc.proto", expectedErrors: []string{"Expected 'returns'"}},
+		{file: "wrong-rpc2.proto", expectedErrors: []string{"Expected ';'"}},
+		{file: "package-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'package' in context: message"}},
+		{file: "syntax-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'syntax' in context: message"}},
+		{file: "import-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'import' in context: message"}},
+		{file: "msg-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'message' in context: service"}},
+		{file: "enum-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'enum' in context: service"}},
+		{file: "extend-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'extend' in context: service"}},
+		{file: "oneof-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'oneof' in context: service"}},
+	}
+
+	for _, tt := range tests {
+		_, err := pbparser.ParseFile(resourceDir + tt.file)
+		if err != nil {
+			for _, msg := range tt.expectedErrors {
+				regex := regexp.MustCompile(msg)
+				if !regex.MatchString(err.Error()) {
+					t.Errorf("File: %v, ExpectedErr: [%v], ActualErr: [%v]\n", tt.file, msg, err.Error())
+				}
+			}
+			continue
+		}
+	}
+}
 
 func TestParseFile(t *testing.T) {
 	var tests = []struct {
@@ -168,3 +236,9 @@ func indent(i int) string {
 	}
 	return s
 }
+
+// init the tabs...
+var (
+	tab  = indent(2)
+	tab2 = indent(4)
+)
