@@ -1,0 +1,12 @@
+syntax = "proto3";
+package missing;
+
+enum EnumAllowingAlias {
+  UNKNOWN = 0;
+  RUNNING = 1;
+}
+
+enum EnumAllowingAlias {
+  UNKNOWN2 = 0;
+  RUNNING2 = 1;
+}

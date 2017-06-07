@@ -1,0 +1,8 @@
+syntax = "proto3";
+package missing;
+
+service TaskMaster {
+  message Task {
+    string id = 1;
+  }
+}
