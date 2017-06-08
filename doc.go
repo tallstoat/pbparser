@@ -60,7 +60,7 @@ Design Considerations
 This library consciously chooses to log no information on it's own. Any failures are communicated
 back to client code via the returned Error.
 
-In case of a parsing error, it retuns an Error back to the client with a line and column number in the file
+In case of a parsing error, it returns an Error back to the client with a line and column number in the file
 on which the parsing error was encountered.
 
 In case of a post-parsing validation error, it returns an Error with enough information to

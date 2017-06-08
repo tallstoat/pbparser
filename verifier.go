@@ -255,14 +255,14 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 		inSamePkg, pkgName := isDatatypeInSamePackage(f.category, packageNames)
 		if inSamePkg {
 			orcl := m[mainpkg]
-			// Check against normal and nested messages & enums in same pacakge
+			// Check against normal and nested messages & enums in same package
 			found = orcl.msgmap[mainpkg+"."+f.category]
 			if !found {
 				found = orcl.enummap[mainpkg+"."+f.category]
 			}
 		} else {
 			orcl := m[pkgName]
-			// Check against normal and nested messages & enums in dependency pacakge
+			// Check against normal and nested messages & enums in dependency package
 			found = orcl.msgmap[f.category]
 			if !found {
 				found = orcl.enummap[f.category]
@@ -288,12 +288,12 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 	if strings.ContainsRune(datatype.Name(), '.') {
 		inSamePkg, pkgName := isDatatypeInSamePackage(datatype.Name(), packageNames)
 		if inSamePkg {
-			// Check against normal as well as nested types in same pacakge
+			// Check against normal as well as nested types in same package
 			orcl := m[mainpkg]
 			found = orcl.msgmap[mainpkg+"."+datatype.Name()]
 		} else {
 			orcl := m[pkgName]
-			// Check against normal and nested messages & enums in dependency pacakge
+			// Check against normal and nested messages & enums in dependency package
 			found = orcl.msgmap[datatype.Name()]
 		}
 	} else {
