@@ -1,3 +1,7 @@
 pbparser
+pbparser.test
 debug*
+
 coverage.out
+cpuprof*
+memprof*
