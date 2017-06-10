@@ -9,8 +9,33 @@ import (
 )
 
 const (
-	resourceDir string = "./resources/erroneous/"
+	errResourceDir string = "./resources/erroneous/"
 )
+
+// NOTE: Keeping this reference around for benchmarking purposes
+var result pbparser.ProtoFile
+
+// BenchmarkParseFile benchmarks the ParseFile() API for a given .proto file.
+// This is meant to be used to uncover any hotspots or memory leaks or code which
+// can be optimized.
+func BenchmarkParseFile(b *testing.B) {
+	b.ReportAllocs()
+	const file = "./resources/descriptor.proto"
+
+	var (
+		err error
+		pf  pbparser.ProtoFile
+	)
+
+	for i := 1; i <= b.N; i++ {
+		if pf, err = pbparser.ParseFile(file); err != nil {
+			b.Errorf("%v", err.Error())
+			continue
+		}
+	}
+
+	result = pf
+}
 
 // TestParseErrors is a test which is meant to cover most of the exception coditions
 // that the parser needs to catch. As such, this needs to be updated whenever new validations
@@ -71,7 +96,7 @@ func TestParseErrors(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		_, err := pbparser.ParseFile(resourceDir + tt.file)
+		_, err := pbparser.ParseFile(errResourceDir + tt.file)
 		if err != nil {
 			for _, msg := range tt.expectedErrors {
 				regex := regexp.MustCompile(msg)
