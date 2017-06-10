@@ -1,5 +1,6 @@
-[![GoDoc](https://godoc.org/github.com/tallstoat/pbparser?status.svg)](https://godoc.org/github.com/tallstoat/pbparser)
+[![Build Status](https://travis-ci.org/tallstoat/pbparser.svg?branch=master)](https://travis-ci.org/tallstoat/pbparser)
 [![GoReportCard](https://goreportcard.com/badge/github.com/tallstoat/pbparser)](https://goreportcard.com/report/github.com/tallstoat/pbparser)
+[![GoDoc](https://godoc.org/github.com/tallstoat/pbparser?status.svg)](https://godoc.org/github.com/tallstoat/pbparser)
 
 # pbparser
 
