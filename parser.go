@@ -1058,39 +1058,18 @@ func (p *parser) readSingleLineComment() string {
 	return str
 }
 
-func (p *parser) readUntil(terminator rune) string {
-	var buf bytes.Buffer
-	for {
-		c := p.read()
-		if c == terminator {
-			break
-		}
-		if c == eof {
-			p.eofReached = true
-			break
-		}
-		_, _ = buf.WriteRune(c)
+func (p *parser) readUntil(delimiter byte) string {
+	s, err := p.br.ReadString(delimiter)
+	if err == io.EOF {
+		p.eofReached = true
 	}
-	return buf.String()
+	return strings.TrimSuffix(s, string(delimiter))
 }
 
 func (p *parser) readUntilNewline() string {
-	var buf bytes.Buffer
-	for {
-		c := p.read()
-		if c == '\n' {
-			break
-		}
-		if c == eof {
-			p.eofReached = true
-			break
-		}
-		_, _ = buf.WriteRune(c)
-	}
-	return buf.String()
+	return p.readUntil('\n')
 }
 
-//NOTE: This is not in use yet!
 func (p *parser) skipUntilNewline() {
 	for {
 		c := p.read()
