@@ -92,7 +92,6 @@ type parser struct {
 	loc            *location
 	eofReached     bool   // We set this flag, when eof is encountered
 	prefix         string // The current package name + nested type names, separated by dots
-	lastRuneRead   rune
 	lastColumnRead int
 }
 
@@ -1119,7 +1118,6 @@ func (p *parser) read() rune {
 		return eof
 	}
 
-	p.lastRuneRead = c
 	p.lastColumnRead = p.loc.column
 
 	if c == '\n' {
