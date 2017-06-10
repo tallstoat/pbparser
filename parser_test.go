@@ -12,6 +12,11 @@ const (
 	resourceDir string = "./resources/erroneous/"
 )
 
+// TestParseErrors is a test which is meant to cover most of the exception coditions
+// that the parser needs to catch. As such, this needs to be updated whenever new validations
+// are added in the parser or old validations are changed. Thus, this test ensures that the code
+// is in sync with the err identification expectations which are presented by the various proto
+// files it uses.
 func TestParseErrors(t *testing.T) {
 	var tests = []struct {
 		file           string
@@ -79,6 +84,12 @@ func TestParseErrors(t *testing.T) {
 	}
 }
 
+// TestParseFile is a functional test which tests most success paths of the parser
+// by way of parsing a set of proto files. The proto files being used all conform to
+// the protobuf spec. This test also serves as a regression test which can be quickly
+// run post code changes to catch any regressions introduced.
+//
+// TODO: This is not an ideal test; needs assertions
 func TestParseFile(t *testing.T) {
 	var tests = []struct {
 		file string
