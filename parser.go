@@ -240,7 +240,7 @@ func (p *parser) readDeclarationsInLoop(pf *ProtoFile, ctx parseCtx) error {
 		}
 		p.skipWhitespace()
 		if p.eofReached {
-			return fmt.Errorf("Reached end of input in %v definition (missing '}')\n", ctx)
+			return fmt.Errorf("Reached end of input in %v definition (missing '}')", ctx)
 		}
 		if c := p.read(); c == '}' {
 			break
@@ -529,8 +529,7 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) 
 	me := MessageElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
 
 	// store previous prefix...
-	var previousPrefix string
-	previousPrefix = p.prefix
+	var previousPrefix = p.prefix
 
 	// update prefix...
 	p.prefix = p.prefix + name + "."

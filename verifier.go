@@ -250,7 +250,7 @@ func findFieldsToValidate(msgs []MessageElement, fields *[]fd) {
 }
 
 func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums []EnumElement, m map[string]protoFileOracle, packageNames []string) error {
-	found := false
+	var found bool
 	if strings.ContainsRune(f.category, '.') {
 		inSamePkg, pkgName := isDatatypeInSamePackage(f.category, packageNames)
 		if inSamePkg {
@@ -284,7 +284,7 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 }
 
 func validateRPCDataType(mainpkg string, service string, rpc string, datatype NamedDataType, msgs []MessageElement, m map[string]protoFileOracle, packageNames []string) error {
-	found := false
+	var found bool
 	if strings.ContainsRune(datatype.Name(), '.') {
 		inSamePkg, pkgName := isDatatypeInSamePackage(datatype.Name(), packageNames)
 		if inSamePkg {
