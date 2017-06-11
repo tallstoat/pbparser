@@ -93,6 +93,7 @@ func TestParseErrors(t *testing.T) {
 		{file: "enum-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'enum' in context: service"}},
 		{file: "extend-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'extend' in context: service"}},
 		{file: "oneof-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'oneof' in context: service"}},
+		{file: "unused-import.proto", expectedErrors: []string{"Imported package: dummy but not used"}},
 	}
 
 	for _, tt := range tests {

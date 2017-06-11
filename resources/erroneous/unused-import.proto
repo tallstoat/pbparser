@@ -1,0 +1,13 @@
+syntax = "proto3";
+package missing;
+
+import "dummy.proto";
+
+message Task {
+  string id = 1;
+  TaskDesc desc = 2;
+}
+
+message TaskDesc {
+  string desc = 1;
+}
