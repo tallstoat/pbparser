@@ -10,12 +10,12 @@ Pbparser is a library for parsing protocol buffer (".proto") files.
 
 Protocol buffers are a flexible and efficient mechanism for serializing structured data. 
 The Protbuf compiler (protoc) is *the source of truth* when it comes to parsing proto files.
-However since protoc (and the parser in it) is written in C++, it presents us with a few challenges :-
+However protoc can be challenging to use in some scenarios :-
 
-* Using it in any automation setup typically involves spawning a process for invoking it. This is not ideal as the output of the compiler in the case of a parse error is messages on stdout. That's not very conducive for building functionality which needs a standard defined output structure to work with.
-* It does not return to the invoking process a parsed model of the proto file. So, it's not useful for another class of usecases where the caller needs a library so it can *use* the parsed model. 
+* Protoc can be invoked by spawning a process from go code. If the caller now relies on the output of the compiler, they would have to parse the messages on stdout. This is fine for situations which need mere validations of proto files but does not work for usecases which require a standard defined parsed output structure to work with.
+* Protoc can also be invoked with *--descriptor_set_out* option to write out the proto file as a FileDescriptorSet (a protocol buffer defined in descriptor.proto). Ideally, this should have been sufficient. However, this again requires one to write a text parser to parse it. 
 
-This library is meant to address the above mentioned challenges.
+This parser library is meant to address the above mentioned challenges.
 
 ## Installing
 
