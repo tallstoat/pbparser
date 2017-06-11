@@ -42,6 +42,11 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	// collate the dependency package names...
 	packageNames := getDependencyPackageNames(m)
 
+	// check if imported packages are in use
+	if err := areImportedPackagesUsed(pf, packageNames); err != nil {
+		return err
+	}
+
 	// make oracle for main package and add to map...
 	orcl := protoFileOracle{pf: pf}
 	orcl.msgmap, orcl.enummap = makeQNameLookup(pf)
@@ -100,6 +105,60 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	// TODO: add more checks here if needed
 
 	return nil
+}
+
+func areImportedPackagesUsed(pf *ProtoFile, packageNames []string) error {
+	for _, pkg := range packageNames {
+		var inuse bool
+		// check if any request/response types are referring to this imported package...
+		for _, service := range pf.Services {
+			for _, rpc := range service.RPCs {
+				if usesPackage(rpc.RequestType.Name(), pkg, packageNames) {
+					inuse = true
+					goto LABEL
+				}
+				if usesPackage(rpc.ResponseType.Name(), pkg, packageNames) {
+					inuse = true
+					goto LABEL
+				}
+			}
+		}
+		// check if any fields in messages (nested or not) are referring to this imported package...
+		if checkImportedPackageUsage(pf.Messages, pkg, packageNames) {
+			inuse = true
+		}
+	LABEL:
+		if !inuse {
+			return errors.New("Imported package: " + pkg + " but not used")
+		}
+	}
+	return nil
+}
+
+func checkImportedPackageUsage(msgs []MessageElement, pkg string, packageNames []string) bool {
+	for _, msg := range msgs {
+		for _, f := range msg.Fields {
+			if f.Type.Category() == NamedDataTypeCategory && usesPackage(f.Type.Name(), pkg, packageNames) {
+				return true
+			}
+		}
+		if len(msg.Messages) > 0 {
+			if checkImportedPackageUsage(msg.Messages, pkg, packageNames) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func usesPackage(s string, pkg string, packageNames []string) bool {
+	if strings.ContainsRune(s, '.') {
+		inSamePkg, pkgName := isDatatypeInSamePackage(s, packageNames)
+		if !inSamePkg && pkg == pkgName {
+			return true
+		}
+	}
+	return false
 }
 
 func validateUniqueMessageEnumNames(ctxName string, enums []EnumElement, msgs []MessageElement) error {
