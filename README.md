@@ -71,5 +71,5 @@ If you run into any issues or have enhancement suggestions, please create an iss
 
 ## License
 
-Pbparser is released under the Apache 2.0 license. See [LICENSE](https://github.com/tallstoat/pbparser/blob/master/LICENSE)
+Pbparser is released under the MIT license. See [LICENSE](https://github.com/tallstoat/pbparser/blob/master/LICENSE)
 
