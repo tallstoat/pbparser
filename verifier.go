@@ -45,7 +45,16 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	// make oracle for main package and add to map...
 	orcl := protoFileOracle{pf: pf}
 	orcl.msgmap, orcl.enummap = makeQNameLookup(pf)
-	m[pf.PackageName] = orcl
+	if _, found := m[pf.PackageName]; found {
+		for k, v := range orcl.msgmap {
+			m[pf.PackageName].msgmap[k] = v
+		}
+		for k, v := range orcl.enummap {
+			m[pf.PackageName].enummap[k] = v
+		}
+	} else {
+		m[pf.PackageName] = orcl
+	}
 
 	// validate if the NamedDataType fields of messages (deep ones as well) are all defined in the model;
 	// either the main model or in dependencies
