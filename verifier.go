@@ -380,7 +380,16 @@ func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[s
 		orcl := protoFileOracle{pf: &dpf}
 		orcl.msgmap, orcl.enummap = makeQNameLookup(&dpf)
 
-		m[dpf.PackageName] = orcl
+		if _, found := m[dpf.PackageName]; found {
+			for k, v := range orcl.msgmap {
+				m[dpf.PackageName].msgmap[k] = v
+			}
+			for k, v := range orcl.enummap {
+				m[dpf.PackageName].enummap[k] = v
+			}
+		} else {
+			m[dpf.PackageName] = orcl
+		}
 	}
 	return nil
 }
