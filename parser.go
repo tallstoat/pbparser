@@ -100,8 +100,8 @@ type parser struct {
 // then declaration in a loop till EOF is reached
 func (p *parser) parse(pf *ProtoFile) error {
 	for {
-		// read any documentation if found...
-		documentation, err := p.readDocumentationIfFound()
+		// read any comments if found...
+		leadingComments, err := p.readLeadingCommentsIfFound()
 		if err != nil {
 			return err
 		}
@@ -116,7 +116,7 @@ func (p *parser) parse(pf *ProtoFile) error {
 		}
 
 		// read any declaration...
-		err = p.readDeclaration(pf, documentation, parseCtx{ctxType: fileCtx})
+		err = p.readDeclaration(pf, leadingComments, parseCtx{ctxType: fileCtx})
 		if err != nil {
 			return err
 		}
@@ -127,7 +127,7 @@ func (p *parser) parse(pf *ProtoFile) error {
 	return nil
 }
 
-func (p *parser) readDocumentationIfFound() (string, error) {
+func (p *parser) readLeadingCommentsIfFound() (string, error) {
 	for {
 		c := p.read()
 		if c == eof {
@@ -137,20 +137,20 @@ func (p *parser) readDocumentationIfFound() (string, error) {
 			p.skipWhitespace()
 			continue
 		} else if isStartOfComment(c) {
-			documentation, err := p.readDocumentation()
+			comments, err := p.readLeadingComments()
 			if err != nil {
 				return "", err
 			}
-			return documentation, nil
+			return comments, nil
 		}
-		// this is not documentation, break out of the loop...
+		// this is not comments, break out of the loop...
 		p.unread()
 		break
 	}
 	return "", nil
 }
 
-func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseCtx) error {
+func (p *parser) readDeclaration(pf *ProtoFile, leadingComments string, ctx parseCtx) error {
 	// Skip unnecessary semicolons...
 	c := p.read()
 	if c == ';' {
@@ -181,52 +181,52 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		if !ctx.permitsOption() {
 			return p.unexpected(label, ctx)
 		}
-		return p.readOption(pf, documentation, ctx)
+		return p.readOption(pf, ctx)
 	} else if label == "message" {
 		if !ctx.permitsMsg() {
 			return p.unexpected(label, ctx)
 		}
-		return p.readMessage(pf, documentation, ctx)
+		return p.readMessage(pf, leadingComments, ctx)
 	} else if label == "enum" {
 		if !ctx.permitsEnum() {
 			return p.unexpected(label, ctx)
 		}
-		return p.readEnum(pf, documentation, ctx)
+		return p.readEnum(pf, leadingComments, ctx)
 	} else if label == "extend" {
 		if !ctx.permitsExtend() {
 			return p.unexpected(label, ctx)
 		}
-		return p.readExtend(pf, documentation, ctx)
+		return p.readExtend(pf, leadingComments, ctx)
 	} else if label == "service" {
-		return p.readService(pf, documentation)
+		return p.readService(pf, leadingComments)
 	} else if label == "rpc" {
 		if !ctx.permitsRPC() {
 			return p.unexpected(label, ctx)
 		}
 		se := ctx.obj.(*ServiceElement)
-		return p.readRPC(pf, se, documentation)
+		return p.readRPC(pf, se, leadingComments)
 	} else if label == "oneof" {
 		if !ctx.permitsOneOf() {
 			return p.unexpected(label, ctx)
 		}
-		return p.readOneOf(pf, documentation, ctx)
+		return p.readOneOf(pf, leadingComments, ctx)
 	} else if label == "extensions" {
 		if !ctx.permitsExtensions() {
 			return p.unexpected(label, ctx)
 		}
-		return p.readExtensions(pf, documentation, ctx)
+		return p.readExtensions(pf, leadingComments, ctx)
 	} else if label == "reserved" {
 		if !ctx.permitsReserved() {
 			return p.unexpected(label, ctx)
 		}
-		return p.readReserved(pf, documentation, ctx)
+		return p.readReserved(pf, leadingComments, ctx)
 	} else if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx || ctx.ctxType == oneOfCtx {
 		if !ctx.permitsField() {
 			return p.errline("fields must be nested")
 		}
-		return p.readField(pf, label, documentation, ctx)
+		return p.readField(pf, label, leadingComments, ctx)
 	} else if ctx.ctxType == enumCtx {
-		return p.readEnumConstant(pf, label, documentation, ctx)
+		return p.readEnumConstant(pf, label, leadingComments, ctx)
 	} else if label != "" {
 		return p.unexpected(label, ctx)
 	}
@@ -235,7 +235,7 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 
 func (p *parser) readDeclarationsInLoop(pf *ProtoFile, ctx parseCtx) error {
 	for {
-		doc, err := p.readDocumentationIfFound()
+		doc, err := p.readLeadingCommentsIfFound()
 		if err != nil {
 			return err
 		}
@@ -255,7 +255,7 @@ func (p *parser) readDeclarationsInLoop(pf *ProtoFile, ctx parseCtx) error {
 	return nil
 }
 
-func (p *parser) readReserved(pf *ProtoFile, documentation string, ctx parseCtx) error {
+func (p *parser) readReserved(pf *ProtoFile, leadingComments string, ctx parseCtx) error {
 	me := ctx.obj.(*MessageElement)
 
 	p.skipWhitespace()
@@ -263,25 +263,25 @@ func (p *parser) readReserved(pf *ProtoFile, documentation string, ctx parseCtx)
 	p.unread()
 
 	if isDigit(c) {
-		if err := p.readReservedRanges(documentation, me); err != nil {
+		if err := p.readReservedRanges(leadingComments, me); err != nil {
 			return err
 		}
 	} else {
-		if err := p.readReservedNames(documentation, me); err != nil {
+		if err := p.readReservedNames(leadingComments, me); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *parser) readReservedRanges(documentation string, me *MessageElement) error {
+func (p *parser) readReservedRanges(leadingComments string, me *MessageElement) error {
 	for {
 		start, err := p.readInt()
 		if err != nil {
 			return err
 		}
 
-		rr := ReservedRangeElement{Start: start, End: start, Documentation: documentation}
+		rr := ReservedRangeElement{Start: start, End: start, Documentation: Comments{Leading: leadingComments}}
 
 		// check if we are done providing the reserved names
 		c := p.read()
@@ -318,7 +318,7 @@ func (p *parser) readReservedRanges(documentation string, me *MessageElement) er
 	return nil
 }
 
-func (p *parser) readReservedNames(documentation string, me *MessageElement) error {
+func (p *parser) readReservedNames(leadingComments string, me *MessageElement) error {
 	for {
 		name, err := p.readQuotedString(nil)
 		if err != nil {
@@ -341,7 +341,7 @@ func (p *parser) readReservedNames(documentation string, me *MessageElement) err
 	return nil
 }
 
-func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
+func (p *parser) readField(pf *ProtoFile, label string, leadingComments string, ctx parseCtx) error {
 	if label == optional && pf.Syntax == proto3 {
 		return p.errline("Explicit 'optional' labels are disallowed in the proto3 syntax. " +
 			"To define 'optional' fields in proto3, simply remove the 'optional' label, as fields " +
@@ -353,7 +353,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	}
 
 	// the field struct...
-	fe := FieldElement{Documentation: documentation}
+	fe := FieldElement{Documentation: Comments{Leading: leadingComments}}
 
 	// figure out dataTypeStr based on the label...
 	var err error
@@ -415,7 +415,14 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		return err
 	}
 
-	// add field to the proper parent	...
+	// extract any remaining comments
+	if fe.Documentation.Trailing, err = p.readTrailingCommentsIfFound(); err != nil {
+		return err
+	}
+
+	//p.skipWhitespace()
+
+	// add field to the proper parent...
 	if ctx.ctxType == msgCtx {
 		me := ctx.obj.(*MessageElement)
 		me.Fields = append(me.Fields, fe)
@@ -447,8 +454,7 @@ func (p *parser) readListOptionsOnALine() ([]OptionElement, error) {
 	} else if c != ';' {
 		return nil, p.throw(';', c)
 	}
-	// Gobble up any inline documentation for a field
-	p.skipUntilNewline()
+
 	return options, nil
 }
 
@@ -469,7 +475,7 @@ func (p *parser) readListOptions() ([]OptionElement, error) {
 	return options, nil
 }
 
-func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) error {
+func (p *parser) readOption(pf *ProtoFile, ctx parseCtx) error {
 	var err error
 	var enc enclosure
 	oe := OptionElement{}
@@ -520,14 +526,14 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 	return nil
 }
 
-func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) error {
+func (p *parser) readMessage(pf *ProtoFile, leadingComments string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
 	if err != nil {
 		return err
 	}
 
-	me := MessageElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
+	me := MessageElement{Name: name, QualifiedName: p.prefix + name, Documentation: Comments{Leading: leadingComments}}
 
 	// store previous prefix...
 	var previousPrefix string
@@ -561,7 +567,7 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) 
 	return nil
 }
 
-func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCtx) error {
+func (p *parser) readExtensions(pf *ProtoFile, leadingComments string, ctx parseCtx) error {
 	if pf.Syntax == proto3 {
 		return p.errline("Extension ranges are not allowed in proto3")
 	}
@@ -573,7 +579,7 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 	}
 
 	// At this point, make End be same as Start...
-	xe := ExtensionsElement{Documentation: documentation, Start: start, End: start}
+	xe := ExtensionsElement{Documentation: Comments{Leading: leadingComments}, Start: start, End: start}
 
 	c := p.read()
 	if c != ';' {
@@ -601,7 +607,7 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 	return nil
 }
 
-func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
+func (p *parser) readEnumConstant(pf *ProtoFile, label string, leadingComments string, ctx parseCtx) error {
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
 		return p.throw('=', c)
@@ -609,7 +615,7 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 	p.skipWhitespace()
 
 	var err error
-	ec := EnumConstantElement{Name: label, Documentation: documentation}
+	ec := EnumConstantElement{Name: label, Documentation: Comments{Leading: leadingComments}}
 
 	if ec.Tag, err = p.readInt(); err != nil {
 		return p.errline("Unable to read tag for Enum Constant: %v due to: %v", label, err.Error())
@@ -620,19 +626,27 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 		return err
 	}
 
+	// extract any remaining comments
+	if ec.Documentation.Trailing, err = p.readTrailingCommentsIfFound(); err != nil {
+		return err
+	}
+
+	// Go to next line
+	p.skipWhitespace()
+
 	ee := ctx.obj.(*EnumElement)
 	ee.EnumConstants = append(ee.EnumConstants, ec)
 	return nil
 }
 
-func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) error {
+func (p *parser) readOneOf(pf *ProtoFile, leadingComments string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
 	if err != nil {
 		return err
 	}
 
-	oe := OneOfElement{Name: name, Documentation: documentation}
+	oe := OneOfElement{Name: name, Documentation: Comments{Leading: leadingComments}}
 
 	p.skipWhitespace()
 	if c := p.read(); c != '{' {
@@ -649,7 +663,7 @@ func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) er
 	return nil
 }
 
-func (p *parser) readExtend(pf *ProtoFile, documentation string, ctx parseCtx) error {
+func (p *parser) readExtend(pf *ProtoFile, leadingComments string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
 	if err != nil {
@@ -659,7 +673,7 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string, ctx parseCtx) e
 	if !strings.Contains(name, ".") && p.prefix != "" {
 		qualifiedName = p.prefix + name
 	}
-	ee := ExtendElement{Name: name, QualifiedName: qualifiedName, Documentation: documentation}
+	ee := ExtendElement{Name: name, QualifiedName: qualifiedName, Documentation: Comments{Leading: leadingComments}}
 
 	p.skipWhitespace()
 	if c := p.read(); c != '{' {
@@ -681,7 +695,7 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string, ctx parseCtx) e
 	return nil
 }
 
-func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string) error {
+func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, leadingComments string) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
 	if err != nil {
@@ -693,7 +707,7 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 	}
 
 	// var requestType, responseType NamedDataType
-	rpc := RPCElement{Name: name, Documentation: documentation}
+	rpc := RPCElement{Name: name, Documentation: Comments{Leading: leadingComments}}
 
 	// parse request type...
 	if rpc.RequestType, err = p.readRequestResponseType(); err != nil {
@@ -737,7 +751,7 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 				break
 			}
 
-			withinRPCBracketsDocumentation, err := p.readDocumentationIfFound()
+			withinRPCBracketsDocumentation, err := p.readLeadingCommentsIfFound()
 			if err != nil {
 				return err
 			}
@@ -752,11 +766,16 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 		return p.throw(';', c)
 	}
 
+	// extract any remaining comments
+	if rpc.Documentation.Trailing, err = p.readTrailingCommentsIfFound(); err != nil {
+		return err
+	}
+
 	se.RPCs = append(se.RPCs, rpc)
 	return nil
 }
 
-func (p *parser) readService(pf *ProtoFile, documentation string) error {
+func (p *parser) readService(pf *ProtoFile, leadingComments string) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
 	if err != nil {
@@ -767,7 +786,7 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 		return p.throw('{', c)
 	}
 
-	se := ServiceElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
+	se := ServiceElement{Name: name, QualifiedName: p.prefix + name, Documentation: Comments{Leading: leadingComments}}
 
 	ctx := parseCtx{ctxType: serviceCtx, obj: &se}
 	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
@@ -778,7 +797,7 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 	return nil
 }
 
-func (p *parser) readEnum(pf *ProtoFile, documentation string, ctx parseCtx) error {
+func (p *parser) readEnum(pf *ProtoFile, leadingComments string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
 	if err != nil {
@@ -789,7 +808,7 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string, ctx parseCtx) err
 		return p.throw('{', c)
 	}
 
-	ee := EnumElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
+	ee := EnumElement{Name: name, QualifiedName: p.prefix + name, Documentation: Comments{Leading: leadingComments}}
 	innerCtx := parseCtx{ctxType: enumCtx, obj: &ee}
 	if err = p.readDeclarationsInLoop(pf, innerCtx); err != nil {
 		return err
@@ -1013,10 +1032,10 @@ func (p *parser) readInt() (int, error) {
 	return intVal, err
 }
 
-func (p *parser) readDocumentation() (string, error) {
+func (p *parser) readLeadingComments() (string, error) {
 	c := p.read()
 	if c == '/' {
-		return p.readSingleLineComment(), nil
+		return p.readSingleLineComments(), nil
 	} else if c == '*' {
 		return p.readMultiLineComment(), nil
 	}
@@ -1042,7 +1061,7 @@ func (p *parser) readMultiLineComment() string {
 }
 
 // Reads one or multiple single line comments
-func (p *parser) readSingleLineComment() string {
+func (p *parser) readSingleLineComments() string {
 	str := strings.TrimSpace(p.readUntilNewline())
 	for {
 		p.skipWhitespace()
@@ -1144,6 +1163,58 @@ func (p *parser) skipWhitespace() {
 	}
 }
 
+func (p *parser) skipHorizontalWhitespace() {
+	for {
+		c := p.read()
+		if c == eof {
+			p.eofReached = true
+			break
+		} else if !isHorizontalWhitespace(c) {
+			p.unread()
+			break
+		}
+	}
+}
+
+func (p *parser) readTrailingCommentsIfFound() (string, error) {
+	for {
+		c := p.read()
+		if c == eof {
+			p.eofReached = true
+			return "", nil
+		} else if isHorizontalWhitespace(c) {
+			p.skipHorizontalWhitespace()
+			continue
+		} else if isStartOfComment(c) {
+			comments, err := p.readTrailingComments()
+			if err != nil {
+				return "", err
+			}
+			return comments, nil
+		}
+		// this is not comments, break out of the loop...
+		p.unread()
+		break
+	}
+	return "", nil
+}
+
+func (p *parser) readTrailingComments() (string, error) {
+	c := p.read()
+	if c == '/' {
+		return p.readSingleLineComment(), nil
+	} else if c == '*' {
+		// Probably no one ever does that, we'll handle it anyway
+		return p.readMultiLineComment(), nil
+	}
+	return "", p.errline("Expected '/' or '*', but found: %v", strconv.QuoteRune(c))
+}
+
+// Reads one single line comment
+func (p *parser) readSingleLineComment() string {
+	return strings.TrimSpace(p.readUntilNewline())
+}
+
 func stripParenthesis(s string) (string, bool) {
 	if s[0] == '(' && s[len(s)-1] == ')' {
 		return parenthesisRemovalRegex.ReplaceAllString(s, "${1}"), true
@@ -1181,6 +1252,10 @@ func isLetter(c rune) bool {
 
 func isDigit(c rune) bool {
 	return (c >= '0' && c <= '9')
+}
+
+func isHorizontalWhitespace(c rune) bool {
+	return c == ' ' || c == '\t'
 }
 
 // End of the file...

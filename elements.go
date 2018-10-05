@@ -1,5 +1,12 @@
 package pbparser
 
+// Comments is a datastructure which models
+// the comments on any construct in a protobuf file.
+type Comments struct {
+	Leading  string
+	Trailing string
+}
+
 // OptionElement is a datastructure which models
 // the option construct in a protobuf file. Option constructs
 // exist at various levels/contexts like file, message etc.
@@ -14,7 +21,7 @@ type OptionElement struct {
 // also have inline options specified.
 type EnumConstantElement struct {
 	Name          string
-	Documentation string
+	Documentation Comments
 	Options       []OptionElement
 	Tag           int
 }
@@ -25,7 +32,7 @@ type EnumConstantElement struct {
 type EnumElement struct {
 	Name          string
 	QualifiedName string
-	Documentation string
+	Documentation Comments
 	Options       []OptionElement
 	EnumConstants []EnumConstantElement
 }
@@ -35,7 +42,7 @@ type EnumElement struct {
 // nested within ServiceElements.
 type RPCElement struct {
 	Name          string
-	Documentation string
+	Documentation Comments
 	Options       []OptionElement
 	RequestType   NamedDataType
 	ResponseType  NamedDataType
@@ -47,7 +54,7 @@ type RPCElement struct {
 type ServiceElement struct {
 	Name          string
 	QualifiedName string
-	Documentation string
+	Documentation Comments
 	Options       []OptionElement
 	RPCs          []RPCElement
 }
@@ -57,7 +64,7 @@ type ServiceElement struct {
 // or an entry in the extend declaration in a protobuf file.
 type FieldElement struct {
 	Name          string
-	Documentation string
+	Documentation Comments
 	Options       []OptionElement
 	Label         string /* optional, required, repeated, oneof */
 	Type          DataType
@@ -70,7 +77,7 @@ type FieldElement struct {
 // set at any time.
 type OneOfElement struct {
 	Name          string
-	Documentation string
+	Documentation Comments
 	Options       []OptionElement
 	Fields        []FieldElement
 }
@@ -82,7 +89,7 @@ type OneOfElement struct {
 // to the original message definition by defining field ranges which
 // can be used for extensions.
 type ExtensionsElement struct {
-	Documentation string
+	Documentation Comments
 	Start         int
 	End           int
 }
@@ -90,7 +97,7 @@ type ExtensionsElement struct {
 // ReservedRangeElement is a datastructure which models
 // a reserved construct in a protobuf message.
 type ReservedRangeElement struct {
-	Documentation string
+	Documentation Comments
 	Start         int
 	End           int
 }
@@ -100,7 +107,7 @@ type ReservedRangeElement struct {
 type MessageElement struct {
 	Name               string
 	QualifiedName      string
-	Documentation      string
+	Documentation      Comments
 	Options            []OptionElement
 	Fields             []FieldElement
 	Enums              []EnumElement
@@ -118,7 +125,7 @@ type MessageElement struct {
 type ExtendElement struct {
 	Name          string
 	QualifiedName string
-	Documentation string
+	Documentation Comments
 	Fields        []FieldElement
 }
 
