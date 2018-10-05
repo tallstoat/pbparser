@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/tallstoat/pbparser"
+	"github.com/troubly/pbparser"
 )
 
 const (
@@ -223,9 +223,12 @@ func fields(fields []pbparser.FieldElement, tab string) {
 	}
 }
 
-func doc(s string, tab string) {
-	if s != "" {
-		fmt.Println(tab + "Doc: " + s)
+func doc(c pbparser.Comments, tab string) {
+	if c.Leading != "" {
+		fmt.Println(tab + "LeadingDoc: " + c.Leading)
+	}
+	if c.Trailing != "" {
+		fmt.Println(tab + "TrailingDoc: " + c.Trailing)
 	}
 }
 
