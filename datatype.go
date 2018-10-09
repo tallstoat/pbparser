@@ -111,6 +111,16 @@ func (mdt MapDataType) Category() DataTypeCategory {
 	return MapDataTypeCategory
 }
 
+// KeyType returns key DataType for MapDataType
+func (mdt MapDataType) KeyType() DataType {
+	return mdt.keyType
+}
+
+// KeyType returns value DataType for MapDataType
+func (mdt MapDataType) ValueType() DataType {
+	return mdt.valueType
+}
+
 // NamedDataType is a construct which represents a message datatype as
 // a RPC request or response and a message/enum datatype as a field in
 // message, oneof or extend declarations.
