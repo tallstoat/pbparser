@@ -124,7 +124,7 @@ func indent(indentLevel int) string {
 
 func formatEnum(enum EnumElement, indentLevel int) string {
 	s := formatComment(enum.Documentation.Leading, indentLevel)
-	s += indent(indentLevel) + fmt.Sprintf("enum %s {\n", enum.QualifiedName)
+	s += indent(indentLevel) + fmt.Sprintf("enum %s {\n", enum.Name)
 	for _, ec := range enum.EnumConstants {
 		s += formatEnumElement(ec, indentLevel+1)
 	}
@@ -147,7 +147,7 @@ func formatEnumElement(ec EnumConstantElement, indentLevel int) string {
 
 func formatService(svc ServiceElement) string {
 	s := formatComment(svc.Documentation.Leading, 0)
-	s += fmt.Sprintf("service %s {\n", svc.QualifiedName)
+	s += fmt.Sprintf("service %s {\n", svc.Name)
 	for _, rpc := range svc.RPCs {
 		s += formatRPC(rpc)
 	}
@@ -171,7 +171,7 @@ func formatRPC(rpc RPCElement) string {
 // Not fully implemented
 func formatMessage(msg MessageElement, indentLevel int) string {
 	s := formatComment(msg.Documentation.Leading, indentLevel)
-	s += indent(indentLevel) + fmt.Sprintf("message %s {\n", msg.QualifiedName)
+	s += indent(indentLevel) + fmt.Sprintf("message %s {\n", msg.Name)
 	s += formatReservedRanges(msg.ReservedRanges, indentLevel+1)
 	for _, f := range msg.Fields {
 		s += formatField(f, indentLevel+1)
@@ -229,6 +229,6 @@ func formatReservedRanges(reserved []ReservedRangeElement, indentLevel int) stri
 	}
 	// Trim last ", "
 	s = s[:len(s)-2]
-	s += ";\n"
+	s += ";\n\n"
 	return s
 }
