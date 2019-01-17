@@ -808,7 +808,12 @@ func (p *parser) readEnum(pf *ProtoFile, leadingComments string, ctx parseCtx) e
 		return p.throw('{', c)
 	}
 
-	ee := EnumElement{Name: name, QualifiedName: p.prefix + name, Documentation: Comments{Leading: leadingComments}}
+	trailingComments, err := p.readTrailingCommentsIfFound()
+	if err != nil {
+		return err
+	}
+
+	ee := EnumElement{Name: name, QualifiedName: p.prefix + name, Documentation: Comments{Leading: leadingComments, Trailing: trailingComments}}
 	innerCtx := parseCtx{ctxType: enumCtx, obj: &ee}
 	if err = p.readDeclarationsInLoop(pf, innerCtx); err != nil {
 		return err
