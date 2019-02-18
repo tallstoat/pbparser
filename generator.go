@@ -173,6 +173,9 @@ func formatMessage(msg MessageElement, indentLevel int) string {
 	s := formatComment(msg.Documentation.Leading, indentLevel)
 	s += indent(indentLevel) + fmt.Sprintf("message %s {\n", msg.Name)
 	s += formatReservedRanges(msg.ReservedRanges, indentLevel+1)
+	for _, o := range msg.OneOfs {
+		s += formatOneOf(o, indentLevel+1)
+	}
 	for _, f := range msg.Fields {
 		s += formatField(f, indentLevel+1)
 	}
@@ -230,5 +233,15 @@ func formatReservedRanges(reserved []ReservedRangeElement, indentLevel int) stri
 	// Trim last ", "
 	s = s[:len(s)-2]
 	s += ";\n\n"
+	return s
+}
+
+func formatOneOf(o OneOfElement, indentLevel int) string {
+	s := formatComment(o.Documentation.Leading, indentLevel)
+	s += indent(indentLevel) + fmt.Sprintf("oneof %s {\n", o.Name)
+	for _, f := range o.Fields {
+		s += formatField(f, indentLevel+1)
+	}
+	s += indent(indentLevel) + "}\n"
 	return s
 }
