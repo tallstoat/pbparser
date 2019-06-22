@@ -92,7 +92,6 @@ type parser struct {
 	loc            *location
 	eofReached     bool   // We set this flag, when eof is encountered
 	prefix         string // The current package name + nested type names, separated by dots
-	lastRuneRead   rune
 	lastColumnRead int
 }
 
@@ -241,7 +240,7 @@ func (p *parser) readDeclarationsInLoop(pf *ProtoFile, ctx parseCtx) error {
 		}
 		p.skipWhitespace()
 		if p.eofReached {
-			return fmt.Errorf("Reached end of input in %v definition (missing '}')\n", ctx)
+			return fmt.Errorf("Reached end of input in %v definition (missing '}')", ctx)
 		}
 		if c := p.read(); c == '}' {
 			break
@@ -530,8 +529,7 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) 
 	me := MessageElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
 
 	// store previous prefix...
-	var previousPrefix string
-	previousPrefix = p.prefix
+	var previousPrefix = p.prefix
 
 	// update prefix...
 	p.prefix = p.prefix + name + "."
@@ -1059,39 +1057,18 @@ func (p *parser) readSingleLineComment() string {
 	return str
 }
 
-func (p *parser) readUntil(terminator rune) string {
-	var buf bytes.Buffer
-	for {
-		c := p.read()
-		if c == terminator {
-			break
-		}
-		if c == eof {
-			p.eofReached = true
-			break
-		}
-		_, _ = buf.WriteRune(c)
+func (p *parser) readUntil(delimiter byte) string {
+	s, err := p.br.ReadString(delimiter)
+	if err == io.EOF {
+		p.eofReached = true
 	}
-	return buf.String()
+	return strings.TrimSuffix(s, string(delimiter))
 }
 
 func (p *parser) readUntilNewline() string {
-	var buf bytes.Buffer
-	for {
-		c := p.read()
-		if c == '\n' {
-			break
-		}
-		if c == eof {
-			p.eofReached = true
-			break
-		}
-		_, _ = buf.WriteRune(c)
-	}
-	return buf.String()
+	return p.readUntil('\n')
 }
 
-//NOTE: This is not in use yet!
 func (p *parser) skipUntilNewline() {
 	for {
 		c := p.read()
@@ -1119,7 +1096,6 @@ func (p *parser) read() rune {
 		return eof
 	}
 
-	p.lastRuneRead = c
 	p.lastColumnRead = p.loc.column
 
 	if c == '\n' {

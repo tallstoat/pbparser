@@ -9,9 +9,39 @@ import (
 )
 
 const (
-	resourceDir string = "./resources/erroneous/"
+	errResourceDir string = "./resources/erroneous/"
 )
 
+// NOTE: Keeping this reference around for benchmarking purposes
+var result pbparser.ProtoFile
+
+// BenchmarkParseFile benchmarks the ParseFile() API for a given .proto file.
+// This is meant to be used to uncover any hotspots or memory leaks or code which
+// can be optimized.
+func BenchmarkParseFile(b *testing.B) {
+	b.ReportAllocs()
+	const file = "./resources/descriptor.proto"
+
+	var (
+		err error
+		pf  pbparser.ProtoFile
+	)
+
+	for i := 1; i <= b.N; i++ {
+		if pf, err = pbparser.ParseFile(file); err != nil {
+			b.Errorf("%v", err.Error())
+			continue
+		}
+	}
+
+	result = pf
+}
+
+// TestParseErrors is a test which is meant to cover most of the exception coditions
+// that the parser needs to catch. As such, this needs to be updated whenever new validations
+// are added in the parser or old validations are changed. Thus, this test ensures that the code
+// is in sync with the err identification expectations which are presented by the various proto
+// files it uses.
 func TestParseErrors(t *testing.T) {
 	var tests = []struct {
 		file           string
@@ -23,7 +53,6 @@ func TestParseErrors(t *testing.T) {
 		{file: "wrong-syntax.proto", expectedErrors: []string{"'syntax' must be 'proto2' or 'proto3'"}},
 		{file: "wrong-syntax2.proto", expectedErrors: []string{"Expected ';'"}},
 		{file: "wrong-syntax3.proto", expectedErrors: []string{"Expected '='"}},
-		{file: "no-package.proto", expectedErrors: []string{"No package specified"}},
 		{file: "optional-in-proto3.proto", expectedErrors: []string{"Explicit 'optional' labels are disallowed in the proto3 syntax"}},
 		{file: "required-in-proto3.proto", expectedErrors: []string{"Required fields are not allowed in proto3"}},
 		{file: "rpc-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'rpc' in context"}},
@@ -63,10 +92,11 @@ func TestParseErrors(t *testing.T) {
 		{file: "enum-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'enum' in context: service"}},
 		{file: "extend-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'extend' in context: service"}},
 		{file: "oneof-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'oneof' in context: service"}},
+		{file: "unused-import.proto", expectedErrors: []string{"Imported package: dummy but not used"}},
 	}
 
 	for _, tt := range tests {
-		_, err := pbparser.ParseFile(resourceDir + tt.file)
+		_, err := pbparser.ParseFile(errResourceDir + tt.file)
 		if err != nil {
 			for _, msg := range tt.expectedErrors {
 				regex := regexp.MustCompile(msg)
@@ -79,6 +109,12 @@ func TestParseErrors(t *testing.T) {
 	}
 }
 
+// TestParseFile is a functional test which tests most success paths of the parser
+// by way of parsing a set of proto files. The proto files being used all conform to
+// the protobuf spec. This test also serves as a regression test which can be quickly
+// run post code changes to catch any regressions introduced.
+//
+// TODO: This is not an ideal test; needs assertions
 func TestParseFile(t *testing.T) {
 	var tests = []struct {
 		file string

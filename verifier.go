@@ -18,11 +18,6 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		return err
 	}
 
-	// validate package
-	if err := validatePackage(pf); err != nil {
-		return err
-	}
-
 	if (len(pf.Dependencies) > 0 || len(pf.PublicDependencies) > 0) && p == nil {
 		return errors.New("ImportModuleProvider is required to validate imports")
 	}
@@ -41,6 +36,11 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 
 	// collate the dependency package names...
 	packageNames := getDependencyPackageNames(m)
+
+	// check if imported packages are in use
+	if err := areImportedPackagesUsed(pf, packageNames); err != nil {
+		return err
+	}
 
 	// make oracle for main package and add to map...
 	orcl := protoFileOracle{pf: pf}
@@ -100,6 +100,60 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	// TODO: add more checks here if needed
 
 	return nil
+}
+
+func areImportedPackagesUsed(pf *ProtoFile, packageNames []string) error {
+	for _, pkg := range packageNames {
+		var inuse bool
+		// check if any request/response types are referring to this imported package...
+		for _, service := range pf.Services {
+			for _, rpc := range service.RPCs {
+				if usesPackage(rpc.RequestType.Name(), pkg, packageNames) {
+					inuse = true
+					goto LABEL
+				}
+				if usesPackage(rpc.ResponseType.Name(), pkg, packageNames) {
+					inuse = true
+					goto LABEL
+				}
+			}
+		}
+		// check if any fields in messages (nested or not) are referring to this imported package...
+		if checkImportedPackageUsage(pf.Messages, pkg, packageNames) {
+			inuse = true
+		}
+	LABEL:
+		if !inuse {
+			return errors.New("Imported package: " + pkg + " but not used")
+		}
+	}
+	return nil
+}
+
+func checkImportedPackageUsage(msgs []MessageElement, pkg string, packageNames []string) bool {
+	for _, msg := range msgs {
+		for _, f := range msg.Fields {
+			if f.Type.Category() == NamedDataTypeCategory && usesPackage(f.Type.Name(), pkg, packageNames) {
+				return true
+			}
+		}
+		if len(msg.Messages) > 0 {
+			if checkImportedPackageUsage(msg.Messages, pkg, packageNames) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func usesPackage(s string, pkg string, packageNames []string) bool {
+	if strings.ContainsRune(s, '.') {
+		inSamePkg, pkgName := isDatatypeInSamePackage(s, packageNames)
+		if !inSamePkg && pkg == pkgName {
+			return true
+		}
+	}
+	return false
 }
 
 func validateUniqueMessageEnumNames(ctxName string, enums []EnumElement, msgs []MessageElement) error {
@@ -192,13 +246,6 @@ func validateSyntax(pf *ProtoFile) error {
 	return nil
 }
 
-func validatePackage(pf *ProtoFile) error {
-	if pf.PackageName == "" {
-		return errors.New("No package specified in the proto file")
-	}
-	return nil
-}
-
 func getDependencyPackageNames(m map[string]protoFileOracle) []string {
 	var keys []string
 	for k := range m {
@@ -250,7 +297,7 @@ func findFieldsToValidate(msgs []MessageElement, fields *[]fd) {
 }
 
 func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums []EnumElement, m map[string]protoFileOracle, packageNames []string) error {
-	found := false
+	var found bool
 	if strings.ContainsRune(f.category, '.') {
 		inSamePkg, pkgName := isDatatypeInSamePackage(f.category, packageNames)
 		if inSamePkg {
@@ -284,7 +331,7 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 }
 
 func validateRPCDataType(mainpkg string, service string, rpc string, datatype NamedDataType, msgs []MessageElement, m map[string]protoFileOracle, packageNames []string) error {
-	found := false
+	var found bool
 	if strings.ContainsRune(datatype.Name(), '.') {
 		inSamePkg, pkgName := isDatatypeInSamePackage(datatype.Name(), packageNames)
 		if inSamePkg {
@@ -360,11 +407,6 @@ func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[s
 
 		// validate syntax
 		if err := validateSyntax(&dpf); err != nil {
-			return err
-		}
-
-		// validate package
-		if err := validatePackage(&dpf); err != nil {
 			return err
 		}
 
