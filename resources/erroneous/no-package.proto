@@ -1,9 +1,0 @@
-syntax = "proto3";
-
-// EnumAllowingAlias docs for testing...
-enum EnumAllowingAlias {
-  option rah = true;
-  UNKNOWN = 0;
-  // da dada dum
-  STARTED = 1 [gah = 3];
-}

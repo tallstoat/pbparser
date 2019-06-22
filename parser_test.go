@@ -53,7 +53,6 @@ func TestParseErrors(t *testing.T) {
 		{file: "wrong-syntax.proto", expectedErrors: []string{"'syntax' must be 'proto2' or 'proto3'"}},
 		{file: "wrong-syntax2.proto", expectedErrors: []string{"Expected ';'"}},
 		{file: "wrong-syntax3.proto", expectedErrors: []string{"Expected '='"}},
-		{file: "no-package.proto", expectedErrors: []string{"No package specified"}},
 		{file: "optional-in-proto3.proto", expectedErrors: []string{"Explicit 'optional' labels are disallowed in the proto3 syntax"}},
 		{file: "required-in-proto3.proto", expectedErrors: []string{"Required fields are not allowed in proto3"}},
 		{file: "rpc-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'rpc' in context"}},

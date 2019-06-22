@@ -18,11 +18,6 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		return err
 	}
 
-	// validate package
-	if err := validatePackage(pf); err != nil {
-		return err
-	}
-
 	if (len(pf.Dependencies) > 0 || len(pf.PublicDependencies) > 0) && p == nil {
 		return errors.New("ImportModuleProvider is required to validate imports")
 	}
@@ -251,13 +246,6 @@ func validateSyntax(pf *ProtoFile) error {
 	return nil
 }
 
-func validatePackage(pf *ProtoFile) error {
-	if pf.PackageName == "" {
-		return errors.New("No package specified in the proto file")
-	}
-	return nil
-}
-
 func getDependencyPackageNames(m map[string]protoFileOracle) []string {
 	var keys []string
 	for k := range m {
@@ -419,11 +407,6 @@ func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[s
 
 		// validate syntax
 		if err := validateSyntax(&dpf); err != nil {
-			return err
-		}
-
-		// validate package
-		if err := validatePackage(&dpf); err != nil {
 			return err
 		}
 
