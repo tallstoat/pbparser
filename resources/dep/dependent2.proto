@@ -1,0 +1,8 @@
+syntax = "proto3";
+package dep;
+
+import "dependency.proto";
+
+message Dependent {
+    dep.SamePackageDependencyMessage field = 1;
+}

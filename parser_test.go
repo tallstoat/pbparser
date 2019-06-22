@@ -122,6 +122,8 @@ func TestParseFile(t *testing.T) {
 		{file: "./resources/enum.proto"},
 		{file: "./resources/service.proto"},
 		{file: "./resources/descriptor.proto"},
+		{file: "./resources/dep/dependent.proto"},
+		{file: "./resources/dep/dependent2.proto"},
 	}
 
 	for i, tt := range tests {

@@ -34,18 +34,30 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		return err
 	}
 
+	// make oracle for main package and add to map...
+	orcl := protoFileOracle{pf: pf}
+	orcl.msgmap, orcl.enummap = makeQNameLookup(pf)
+	if _, found := m[pf.PackageName]; found {
+		for k, v := range orcl.msgmap {
+			m[pf.PackageName].msgmap[k] = v
+		}
+		for k, v := range orcl.enummap {
+			m[pf.PackageName].enummap[k] = v
+		}
+
+		// update the main model as well in case it is defined across multiple files
+		merge(pf, m[pf.PackageName].pf)
+	} else {
+		m[pf.PackageName] = orcl
+	}
+
 	// collate the dependency package names...
-	packageNames := getDependencyPackageNames(m)
+	packageNames := getDependencyPackageNames(pf.PackageName, m)
 
 	// check if imported packages are in use
 	if err := areImportedPackagesUsed(pf, packageNames); err != nil {
 		return err
 	}
-
-	// make oracle for main package and add to map...
-	orcl := protoFileOracle{pf: pf}
-	orcl.msgmap, orcl.enummap = makeQNameLookup(pf)
-	m[pf.PackageName] = orcl
 
 	// validate if the NamedDataType fields of messages (deep ones as well) are all defined in the model;
 	// either the main model or in dependencies
@@ -100,6 +112,27 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	// TODO: add more checks here if needed
 
 	return nil
+}
+
+func merge(dest *ProtoFile, src *ProtoFile) {
+	for _, d := range src.Dependencies {
+		dest.Dependencies = append(dest.Dependencies, d)
+	}
+	for _, d := range src.PublicDependencies {
+		dest.PublicDependencies = append(dest.PublicDependencies, d)
+	}
+	for _, d := range src.Options {
+		dest.Options = append(dest.Options, d)
+	}
+	for _, d := range src.Messages {
+		dest.Messages = append(dest.Messages, d)
+	}
+	for _, d := range src.Enums {
+		dest.Enums = append(dest.Enums, d)
+	}
+	for _, d := range src.ExtendDeclarations {
+		dest.ExtendDeclarations = append(dest.ExtendDeclarations, d)
+	}
 }
 
 func areImportedPackagesUsed(pf *ProtoFile, packageNames []string) error {
@@ -246,9 +279,12 @@ func validateSyntax(pf *ProtoFile) error {
 	return nil
 }
 
-func getDependencyPackageNames(m map[string]protoFileOracle) []string {
+func getDependencyPackageNames(mainPkgName string, m map[string]protoFileOracle) []string {
 	var keys []string
 	for k := range m {
+		if k == mainPkgName {
+			continue
+		}
 		keys = append(keys, k)
 	}
 	return keys
@@ -302,10 +338,20 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 		inSamePkg, pkgName := isDatatypeInSamePackage(f.category, packageNames)
 		if inSamePkg {
 			orcl := m[mainpkg]
+
+			var msgMatchTerm, enumMatchTerm string
+			if !strings.HasPrefix(f.category, mainpkg+".") {
+				msgMatchTerm = mainpkg + "." + f.category
+				enumMatchTerm = mainpkg + "." + f.category
+			} else {
+				msgMatchTerm = f.category
+				enumMatchTerm = f.category
+			}
+
 			// Check against normal and nested messages & enums in same package
-			found = orcl.msgmap[mainpkg+"."+f.category]
+			found = orcl.msgmap[msgMatchTerm]
 			if !found {
-				found = orcl.enummap[mainpkg+"."+f.category]
+				found = orcl.enummap[enumMatchTerm]
 			}
 		} else {
 			orcl := m[pkgName]
@@ -413,7 +459,16 @@ func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[s
 		orcl := protoFileOracle{pf: &dpf}
 		orcl.msgmap, orcl.enummap = makeQNameLookup(&dpf)
 
-		m[dpf.PackageName] = orcl
+		if _, found := m[dpf.PackageName]; found {
+			for k, v := range orcl.msgmap {
+				m[dpf.PackageName].msgmap[k] = v
+			}
+			for k, v := range orcl.enummap {
+				m[dpf.PackageName].enummap[k] = v
+			}
+		} else {
+			m[dpf.PackageName] = orcl
+		}
 	}
 	return nil
 }
