@@ -339,19 +339,17 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 		if inSamePkg {
 			orcl := m[mainpkg]
 
-			var msgMatchTerm, enumMatchTerm string
+			var matchTerm string
 			if !strings.HasPrefix(f.category, mainpkg+".") {
-				msgMatchTerm = mainpkg + "." + f.category
-				enumMatchTerm = mainpkg + "." + f.category
+				matchTerm = mainpkg + "." + f.category
 			} else {
-				msgMatchTerm = f.category
-				enumMatchTerm = f.category
+				matchTerm = f.category
 			}
 
 			// Check against normal and nested messages & enums in same package
-			found = orcl.msgmap[msgMatchTerm]
+			found = orcl.msgmap[matchTerm]
 			if !found {
-				found = orcl.enummap[enumMatchTerm]
+				found = orcl.enummap[matchTerm]
 			}
 		} else {
 			orcl := m[pkgName]
