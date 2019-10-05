@@ -485,8 +485,18 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 	}
 	p.skipWhitespace()
 
-	if p.read() == '"' {
+	c := p.read()
+	if c == '"' {
 		oe.Value = p.readUntil('"')
+	} else if c == '{' {
+		if ctx.ctxType != rpcCtx {
+			return p.errline("Options starting with '{' are only supported within rpc declarations")
+		}
+		// NOTE: We could parse the option value further as per the HttpRule definition in
+		// https://github.com/googleapis/googleapis/blob/master/google/api/http.proto but that
+		// would be implementing a grpc parser which we do not intend to become. Hence we will just return
+		// the content within the curly braces and the invoking party can further parse it as needed.
+		oe.Value = p.readUntil('}')
 	} else {
 		p.unread()
 		oe.Value = p.readWord()
@@ -962,14 +972,12 @@ func (p *parser) readName() (string, enclosure, error) {
 		if p.read() != ')' {
 			return "", enc, p.errline("Expected ')'")
 		}
-		p.unread()
 	} else if c == '[' {
 		enc = bracket
 		name = p.readWord()
 		if p.read() != ']' {
 			return "", enc, p.errline("Expected ']'")
 		}
-		p.unread()
 	} else {
 		p.unread()
 		name = p.readWord()

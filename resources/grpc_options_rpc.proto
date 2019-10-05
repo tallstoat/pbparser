@@ -1,0 +1,20 @@
+/* Inbox service blah blah adsd
+sfsf fafasf affaf fasfaf
+*/
+syntax = "proto3";
+package echoservice;
+
+message StringMessage {
+   string value = 1;
+}
+
+// EchoService: self-explanatory
+service EchoService {
+  rpc Echo(StringMessage) returns (StringMessage) {
+     option (google.api.http) = {
+       post: "/v1/example/echo"
+       body: "*"
+     };
+  }
+}
+
