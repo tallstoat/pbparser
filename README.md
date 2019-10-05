@@ -61,6 +61,8 @@ Please refer to the [examples](https://godoc.org/github.com/tallstoat/pbparser#p
 
 If you run into any issues or have enhancement suggestions, please create an issue [here](https://github.com/tallstoat/pbparser/issues).
 
+However I would much prefer PRs since at this time I'm unable to work on issues :-/
+
 ## Contributing
 
 1. Fork this repo.
