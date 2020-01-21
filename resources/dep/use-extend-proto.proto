@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package use_extension;
+
+option file_option = true;
+
+// import this extender-proto, but do not use any messages from it
+// (because there are none)
+import "extend-proto.proto";
+
+message ExtensionTesting {
+  option (message_option) = true;
+
+  string field_level = 1 [ (field_option) = true ];
+}
+
+enum EnumTesting {
+    option (enum_option) = true;
+
+    FOO = 0 [ (enum_value_option) = true ];
+    BAR = 1;
+}
+
+service Service {
+    option (service_option) = true;
+
+    rpc Test (ExtensionTesting) returns (ExtensionTesting) {
+        option (method_option) = true;
+    };
+}
