@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package unused_extension;
+
+import "unused-extend-import.proto";
+
+message ExtensionTesting {
+  bool something = 1;
+  uint32 other_field = 2;
+}

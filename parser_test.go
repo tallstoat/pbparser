@@ -93,6 +93,7 @@ func TestParseErrors(t *testing.T) {
 		{file: "extend-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'extend' in context: service"}},
 		{file: "oneof-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'oneof' in context: service"}},
 		{file: "unused-import.proto", expectedErrors: []string{"Imported package: dummy but not used"}},
+		{file: "unused-extend.proto", expectedErrors: []string{"Imported package: unused_extend but not used"}},
 	}
 
 	for _, tt := range tests {
@@ -124,6 +125,7 @@ func TestParseFile(t *testing.T) {
 		{file: "./resources/descriptor.proto"},
 		{file: "./resources/dep/dependent.proto"},
 		{file: "./resources/dep/dependent2.proto"},
+		{file: "./resources/dep/use-extend-proto.proto"},
 	}
 
 	for i, tt := range tests {

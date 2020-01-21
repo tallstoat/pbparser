@@ -55,7 +55,7 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	packageNames := getDependencyPackageNames(pf.PackageName, m)
 
 	// check if imported packages are in use
-	if err := areImportedPackagesUsed(pf, packageNames); err != nil {
+	if err := areImportedPackagesUsed(pf, packageNames, m); err != nil {
 		return err
 	}
 
@@ -135,9 +135,49 @@ func merge(dest *ProtoFile, src *ProtoFile) {
 	}
 }
 
-func areImportedPackagesUsed(pf *ProtoFile, packageNames []string) error {
+func extendsProtobuf(pkg string, m map[string]protoFileOracle) bool {
+	orcl := m[pkg]
+	for _, ext := range orcl.pf.ExtendDeclarations {
+		switch ext.Name {
+		case "google.protobuf.FileOptions",
+			"google.protobuf.MessageOptions",
+			"google.protobuf.FieldOptions",
+			"google.protobuf.EnumOptions",
+			"google.protobuf.EnumValueOptions",
+			"google.protobuf.ServiceOptions",
+			"google.protobuf.MethodOptions":
+			return true
+
+		default:
+			continue
+		}
+	}
+
+	return false
+}
+
+func extendsImportedPackage(pkgName string, m map[string]protoFileOracle) bool {
+	orcl := m[pkgName]
+	for _, ext := range orcl.pf.ExtendDeclarations {
+		extTargetParts := strings.Split(ext.Name, ".")
+		extPkg := strings.Join(extTargetParts[:len(extTargetParts)-1], ".")
+
+		if _, exists := m[extPkg]; exists {
+			return true
+		}
+	}
+	return false
+}
+
+func areImportedPackagesUsed(pf *ProtoFile, packageNames []string, m map[string]protoFileOracle) error {
 	for _, pkg := range packageNames {
 		var inuse bool
+
+		if extendsProtobuf(pkg, m) || extendsImportedPackage(pkg, m) {
+			inuse = true
+			goto LABEL
+		}
+
 		// check if any request/response types are referring to this imported package...
 		for _, service := range pf.Services {
 			for _, rpc := range service.RPCs {

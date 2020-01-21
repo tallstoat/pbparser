@@ -479,6 +479,14 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 	}
 	oe.IsParenthesized = (enc == parenthesis)
 
+	// p.readName() calls p.unread() after parsing the enclosures leaving us on
+	// the closing brace of the enclose -- get rid of that
+	if oe.IsParenthesized {
+		if c := p.read(); c != ')' {
+			return p.throw(')', c)
+		}
+	}
+
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
 		return p.throw('=', c)

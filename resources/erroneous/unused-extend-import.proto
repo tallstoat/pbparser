@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package unused_extend;
+
+// import the wrappers to get UInt32Value
+import "google/protobuf/wrappers.proto";
+
+// give it some extra options
+extend google.protobuf.UInt32Value {
+  uint32 min_value = 9999998;
+  uint32 max_value = 9999999;
+}

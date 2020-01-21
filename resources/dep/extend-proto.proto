@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FileOptions {
+  bool file_option = 9999999;
+}
+
+extend google.protobuf.MessageOptions {
+  bool message_option = 9999999;
+}
+
+extend google.protobuf.FieldOptions {
+  bool field_option = 9999999;
+}
+
+extend google.protobuf.EnumOptions {
+  bool enum_option = 9999999;
+}
+
+extend google.protobuf.EnumValueOptions {
+  bool enum_value_option = 9999999;
+}
+
+extend google.protobuf.ServiceOptions {
+  bool service_option = 9999999;
+}
+
+extend google.protobuf.MethodOptions {
+  bool method_option = 9999999;
+}
+
