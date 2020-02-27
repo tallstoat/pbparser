@@ -1,10 +1,8 @@
-package pbparser_test
+package pbparser
 
 import (
 	"fmt"
 	"os"
-
-	"github.com/tallstoat/pbparser"
 )
 
 // Example code for the ParseFile() API
@@ -12,7 +10,7 @@ func Example_parseFile() {
 	file := "./examples/mathservice.proto"
 
 	// invoke ParseFile() API to parse the file
-	pf, err := pbparser.ParseFile(file)
+	pf, err := ParseFile(file)
 	if err != nil {
 		fmt.Printf("Unable to parse proto file: %v \n", err)
 		os.Exit(-1)

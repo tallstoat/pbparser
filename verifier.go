@@ -55,16 +55,17 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	packageNames := getDependencyPackageNames(pf.PackageName, m)
 
 	// check if imported packages are in use
-	if err := areImportedPackagesUsed(pf, packageNames); err != nil {
+	if err := areImportedPackagesUsed(pf, packageNames, m); err != nil {
 		return err
 	}
 
-	// validate if the NamedDataType fields of messages (deep ones as well) are all defined in the model;
-	// either the main model or in dependencies
+	// validate if the NamedDataType fields of messages (deep ones as well)
+	// are all defined in the model; either the main model or in dependencies
 	fields := []fd{}
 	findFieldsToValidate(pf.Messages, &fields)
 	for _, f := range fields {
-		if err := validateFieldDataTypes(pf.PackageName, f, pf.Messages, pf.Enums, m, packageNames); err != nil {
+		if err := validateFieldDataTypes(
+			pf.PackageName, f, pf.Messages, pf.Enums, m, packageNames); err != nil {
 			return err
 		}
 	}
@@ -73,17 +74,24 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	// either the main model or in dependencies
 	for _, s := range pf.Services {
 		for _, rpc := range s.RPCs {
-			if err := validateRPCDataType(pf.PackageName, s.Name, rpc.Name, rpc.RequestType, pf.Messages, m, packageNames); err != nil {
+			err := validateRPCDataType(
+				pf.PackageName, s.Name, rpc.Name, rpc.RequestType, pf.Messages, m, packageNames)
+			if err != nil {
 				return err
 			}
-			if err := validateRPCDataType(pf.PackageName, s.Name, rpc.Name, rpc.ResponseType, pf.Messages, m, packageNames); err != nil {
+
+			err = validateRPCDataType(
+				pf.PackageName, s.Name, rpc.Name, rpc.ResponseType, pf.Messages, m, packageNames)
+			if err != nil {
 				return err
 			}
 		}
 	}
 
-	// validate that message and enum names are unique in the package as well as at the nested msg level (howsoever deep)
-	if err := validateUniqueMessageEnumNames("package "+pf.PackageName, pf.Enums, pf.Messages); err != nil {
+	// validate that message and enum names are unique in the package as well as
+	// at the nested msg level (howsoever deep)
+	err := validateUniqueMessageEnumNames("package "+pf.PackageName, pf.Enums, pf.Messages)
+	if err != nil {
 		return err
 	}
 
@@ -91,7 +99,8 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	if err := validateEnumConstants("package "+pf.PackageName, pf.Enums); err != nil {
 		return err
 	}
-	// validate if enum constants are unique across nested enums within nested messages (howsoever deep)
+	// validate if enum constants are unique across nested enums within
+	// nested messages (howsoever deep)
 	for _, msg := range pf.Messages {
 		if err := validateEnumConstantsInMessage(msg); err != nil {
 			return err
@@ -102,7 +111,8 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	if err := validateEnumConstantTagAliases(pf.Enums); err != nil {
 		return err
 	}
-	// allow aliases in nested enums within nested messages (howsoever deep) only if option allow_alias is specified
+	// allow aliases in nested enums within nested messages (howsoever deep) only if
+	// option allow_alias is specified
 	for _, msg := range pf.Messages {
 		if err := validateEnumConstantTagAliasesInMessage(msg); err != nil {
 			return err
@@ -115,29 +125,61 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 }
 
 func merge(dest *ProtoFile, src *ProtoFile) {
-	for _, d := range src.Dependencies {
-		dest.Dependencies = append(dest.Dependencies, d)
-	}
-	for _, d := range src.PublicDependencies {
-		dest.PublicDependencies = append(dest.PublicDependencies, d)
-	}
-	for _, d := range src.Options {
-		dest.Options = append(dest.Options, d)
-	}
-	for _, d := range src.Messages {
-		dest.Messages = append(dest.Messages, d)
-	}
-	for _, d := range src.Enums {
-		dest.Enums = append(dest.Enums, d)
-	}
-	for _, d := range src.ExtendDeclarations {
-		dest.ExtendDeclarations = append(dest.ExtendDeclarations, d)
-	}
+	dest.Dependencies = append(dest.Dependencies, src.Dependencies...)
+	dest.PublicDependencies = append(dest.PublicDependencies, src.PublicDependencies...)
+	dest.Options = append(dest.Options, src.Options...)
+	dest.Messages = append(dest.Messages, src.Messages...)
+	dest.Enums = append(dest.Enums, src.Enums...)
+	dest.ExtendDeclarations = append(dest.ExtendDeclarations, src.ExtendDeclarations...)
 }
 
-func areImportedPackagesUsed(pf *ProtoFile, packageNames []string) error {
+func extendsProtobuf(pkg string, m map[string]protoFileOracle) bool {
+	orcl := m[pkg]
+	for _, ext := range orcl.pf.ExtendDeclarations {
+		switch ext.Name {
+		case "google.protobuf.FileOptions",
+			"google.protobuf.MessageOptions",
+			"google.protobuf.FieldOptions",
+			"google.protobuf.EnumOptions",
+			"google.protobuf.EnumValueOptions",
+			"google.protobuf.ServiceOptions",
+			"google.protobuf.MethodOptions":
+			return true
+
+		default:
+			continue
+		}
+	}
+
+	return false
+}
+
+func extendsImportedPackage(pkgName string, m map[string]protoFileOracle) bool {
+	orcl := m[pkgName]
+	for _, ext := range orcl.pf.ExtendDeclarations {
+		extTargetParts := strings.Split(ext.Name, ".")
+		extPkg := strings.Join(extTargetParts[:len(extTargetParts)-1], ".")
+
+		if _, exists := m[extPkg]; exists {
+			return true
+		}
+	}
+	return false
+}
+
+func areImportedPackagesUsed(
+	pf *ProtoFile,
+	packageNames []string,
+	m map[string]protoFileOracle,
+) error {
 	for _, pkg := range packageNames {
 		var inuse bool
+
+		if extendsProtobuf(pkg, m) || extendsImportedPackage(pkg, m) {
+			inuse = true
+			goto LABEL
+		}
+
 		// check if any request/response types are referring to this imported package...
 		for _, service := range pf.Services {
 			for _, rpc := range service.RPCs {
@@ -166,7 +208,8 @@ func areImportedPackagesUsed(pf *ProtoFile, packageNames []string) error {
 func checkImportedPackageUsage(msgs []MessageElement, pkg string, packageNames []string) bool {
 	for _, msg := range msgs {
 		for _, f := range msg.Fields {
-			if f.Type.Category() == NamedDataTypeCategory && usesPackage(f.Type.Name(), pkg, packageNames) {
+			if f.Type.Category() == NamedDataTypeCategory &&
+				usesPackage(f.Type.Name(), pkg, packageNames) {
 				return true
 			}
 		}
@@ -189,7 +232,9 @@ func usesPackage(s string, pkg string, packageNames []string) bool {
 	return false
 }
 
-func validateUniqueMessageEnumNames(ctxName string, enums []EnumElement, msgs []MessageElement) error {
+func validateUniqueMessageEnumNames(
+	ctxName string, enums []EnumElement, msgs []MessageElement,
+) error {
 	m := make(map[string]bool)
 	for _, en := range enums {
 		if m[en.Name] {
@@ -204,7 +249,8 @@ func validateUniqueMessageEnumNames(ctxName string, enums []EnumElement, msgs []
 		m[msg.Name] = true
 	}
 	for _, msg := range msgs {
-		if err := validateUniqueMessageEnumNames("message "+msg.Name, msg.Enums, msg.Messages); err != nil {
+		err := validateUniqueMessageEnumNames("message "+msg.Name, msg.Enums, msg.Messages)
+		if err != nil {
 			return err
 		}
 	}
@@ -217,7 +263,9 @@ func validateEnumConstantTagAliases(enums []EnumElement) error {
 		for _, enc := range en.EnumConstants {
 			if m[enc.Tag] {
 				if !isAllowAlias(&en) {
-					return errors.New(enc.Name + " is reusing an enum value. If this is intended, set 'option allow_alias = true;' in the enum")
+					return errors.New(enc.Name +
+						" is reusing an enum value. If this is intended," +
+						" set 'option allow_alias = true;' in the enum")
 				}
 			}
 			m[enc.Tag] = true
@@ -332,7 +380,14 @@ func findFieldsToValidate(msgs []MessageElement, fields *[]fd) {
 	}
 }
 
-func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums []EnumElement, m map[string]protoFileOracle, packageNames []string) error {
+func validateFieldDataTypes(
+	mainpkg string,
+	f fd,
+	msgs []MessageElement,
+	enums []EnumElement,
+	m map[string]protoFileOracle,
+	packageNames []string,
+) error {
 	var found bool
 	if strings.ContainsRune(f.category, '.') {
 		inSamePkg, pkgName := isDatatypeInSamePackage(f.category, packageNames)
@@ -364,19 +419,29 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 	} else {
 		// Check any nested messages and nested enums in the same message which has the field
 		found = checkMsgOrEnumName(f.category, f.msg.Messages, f.msg.Enums)
-		// If not a nested message or enum, then just check first class messages & enums in the package
+		// If not a nested message or enum, then just check first class
+		// messages & enums in the package
 		if !found {
 			found = checkMsgOrEnumName(f.category, msgs, enums)
 		}
 	}
 	if !found {
-		msg := fmt.Sprintf("Datatype: '%v' referenced in field: '%v' is not defined", f.category, f.name)
+		msg := fmt.Sprintf("Datatype: '%v' referenced in field: '%v' is not defined",
+			f.category, f.name)
 		return errors.New(msg)
 	}
 	return nil
 }
 
-func validateRPCDataType(mainpkg string, service string, rpc string, datatype NamedDataType, msgs []MessageElement, m map[string]protoFileOracle, packageNames []string) error {
+func validateRPCDataType(
+	mainpkg string,
+	service string,
+	rpc string,
+	datatype NamedDataType,
+	msgs []MessageElement,
+	m map[string]protoFileOracle,
+	packageNames []string,
+) error {
 	var found bool
 	if strings.ContainsRune(datatype.Name(), '.') {
 		inSamePkg, pkgName := isDatatypeInSamePackage(datatype.Name(), packageNames)
@@ -393,7 +458,8 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 		found = checkMsgName(datatype.Name(), msgs)
 	}
 	if !found {
-		msg := fmt.Sprintf("Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message type", datatype.Name(), rpc, service)
+		msg := fmt.Sprintf("Datatype: '%v' referenced in RPC: '%v' of Service: '%v'"+
+			" is not defined OR is not a message type", datatype.Name(), rpc, service)
 		return errors.New(msg)
 	}
 	return nil
@@ -433,15 +499,21 @@ func checkEnumName(s string, enums []EnumElement) bool {
 	return false
 }
 
-func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[string]protoFileOracle) error {
+func parseDependencies(
+	impr ImportModuleProvider,
+	dependencies []string,
+	m map[string]protoFileOracle,
+) error {
 	for _, d := range dependencies {
 		r, err := impr.Provide(d)
 		if err != nil {
-			msg := fmt.Sprintf("ImportModuleReader is unable to provide content of dependency module %v. Reason:: %v", d, err.Error())
+			msg := fmt.Sprintf("ImportModuleReader is unable to provide content of "+
+				"dependency module %v. Reason:: %v", d, err.Error())
 			return errors.New(msg)
 		}
 		if r == nil {
-			msg := fmt.Sprintf("ImportModuleReader is unable to provide reader for dependency module %v", d)
+			msg := fmt.Sprintf("ImportModuleReader is unable to provide reader for "+
+				"dependency module %v", d)
 			return errors.New(msg)
 		}
 

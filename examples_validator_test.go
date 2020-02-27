@@ -1,4 +1,4 @@
-package pbparser_test
+package pbparser
 
 import "testing"
 

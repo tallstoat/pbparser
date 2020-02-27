@@ -11,8 +11,11 @@ import (
 type DataTypeCategory int
 
 const (
+	// ScalarDataTypeCategory indicates a scalar-builtin datatype
 	ScalarDataTypeCategory DataTypeCategory = iota
+	// MapDataTypeCategory indicates a protobuf map datatype
 	MapDataTypeCategory
+	// NamedDataTypeCategory indiciate a named type-reference. Primarily used in RPC definitions.
 	NamedDataTypeCategory
 )
 
@@ -29,21 +32,37 @@ type DataType interface {
 type ScalarType int
 
 const (
+	// AnyScalar represents the Any protobuf type
 	AnyScalar ScalarType = iota + 1
+	// BoolScalar represents the Bool protobuf type
 	BoolScalar
+	// BytesScalar represents the Bytes protobuf type
 	BytesScalar
+	// DoubleScalar represents the Double protobuf type
 	DoubleScalar
+	// FloatScalar represents the Float protobuf type
 	FloatScalar
+	// Fixed32Scalar represents the Fixed32 protobuf type
 	Fixed32Scalar
+	// Fixed64Scalar represents the Fixed64 protobuf type
 	Fixed64Scalar
+	// Int32Scalar represents the Int32 protobuf type
 	Int32Scalar
+	// Int64Scalar represents the Int64 protobuf type
 	Int64Scalar
+	// Sfixed32Scalar represents the SFixed32 protobuf type
 	Sfixed32Scalar
+	// Sfixed64Scalar represents the SFixed64 protobuf type
 	Sfixed64Scalar
+	// Sint32Scalar represents the SInt32 protobuf type
 	Sint32Scalar
+	// Sint64Scalar represents the SInt64 protobuf type
 	Sint64Scalar
+	// StringScalar represents the String protobuf type
 	StringScalar
+	// Uint32Scalar represents the UInt32 protobuf type
 	Uint32Scalar
+	// Uint64Scalar represents the UInt64 protobuf type
 	Uint64Scalar
 )
 
@@ -97,13 +116,13 @@ func NewScalarDataType(s string) (ScalarDataType, error) {
 
 // MapDataType is a construct which represents a protobuf map datatype.
 type MapDataType struct {
-	keyType   DataType
-	valueType DataType
+	KeyType   DataType
+	ValueType DataType
 }
 
 // Name function implementation of interface DataType for MapDataType
 func (mdt MapDataType) Name() string {
-	return "map<" + mdt.keyType.Name() + ", " + mdt.valueType.Name() + ">"
+	return "map<" + mdt.KeyType.Name() + ", " + mdt.ValueType.Name() + ">"
 }
 
 // Category function implementation of interface DataType for MapDataType

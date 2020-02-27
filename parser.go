@@ -343,8 +343,8 @@ func (p *parser) readReservedNames(documentation string, me *MessageElement) err
 func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
 	if label == optional && pf.Syntax == proto3 {
 		return p.errline("Explicit 'optional' labels are disallowed in the proto3 syntax. " +
-			"To define 'optional' fields in proto3, simply remove the 'optional' label, as fields " +
-			"are 'optional' by default.")
+			"To define 'optional' fields in proto3, simply remove the 'optional' label, " +
+			"as fields are 'optional' by default.")
 	} else if label == required && pf.Syntax == proto3 {
 		return p.errline("Required fields are not allowed in proto3")
 	} else if label == required && ctx.ctxType == extendCtx {
@@ -383,10 +383,11 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 			return p.errline("Map fields are not allowed to be extensions")
 		}
 		mdt := fe.Type.(MapDataType)
-		if mdt.keyType.Name() == "float" || mdt.keyType.Name() == "double" || mdt.keyType.Name() == "bytes" {
+		if mdt.KeyType.Name() == "float" || mdt.KeyType.Name() == "double" ||
+			mdt.KeyType.Name() == "bytes" {
 			return p.errline("Key in map fields cannot be float, double or bytes")
 		}
-		if mdt.keyType.Category() == NamedDataTypeCategory {
+		if mdt.KeyType.Category() == NamedDataTypeCategory {
 			return p.errline("Key in map fields cannot be a named type")
 		}
 	}
@@ -478,6 +479,14 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 		return err
 	}
 	oe.IsParenthesized = (enc == parenthesis)
+
+	// p.readName() calls p.unread() after parsing the enclosures leaving us on
+	// the closing brace of the enclose -- get rid of that
+	if oe.IsParenthesized {
+		if c := p.read(); c != ')' {
+			return p.throw(')', c)
+		}
+	}
 
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
@@ -599,7 +608,11 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 	return nil
 }
 
-func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
+func (p *parser) readEnumConstant(
+	pf *ProtoFile,
+	label string, documentation string,
+	ctx parseCtx,
+) error {
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
 		return p.throw('=', c)
@@ -613,7 +626,8 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 		return p.errline("Unable to read tag for Enum Constant: %v due to: %v", label, err.Error())
 	}
 
-	// If semicolon is next; we are done. If '[' is next, we must parse options for the enum constant
+	// If semicolon is next; we are done. If '[' is next, we must parse
+	// options for the enum constant
 	if ec.Options, err = p.readListOptionsOnALine(); err != nil {
 		return err
 	}
@@ -921,7 +935,7 @@ func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 		if c := p.read(); c != '>' {
 			return nil, p.throw('>', c)
 		}
-		return MapDataType{keyType: keyType, valueType: valueType}, nil
+		return MapDataType{KeyType: keyType, ValueType: valueType}, nil
 	}
 
 	// is it a scalar type?
@@ -939,7 +953,8 @@ func (p *parser) unexpected(label string, ctx parseCtx) error {
 }
 
 func (p *parser) throw(expected rune, actual rune) error {
-	return p.errcol("Expected %v, but found: %v", strconv.QuoteRune(expected), strconv.QuoteRune(actual))
+	return p.errcol("Expected %v, but found: %v",
+		strconv.QuoteRune(expected), strconv.QuoteRune(actual))
 }
 
 func (p *parser) errline(msg string, a ...interface{}) error {

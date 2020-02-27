@@ -1,7 +1,3 @@
-[![Build Status](https://travis-ci.org/tallstoat/pbparser.svg?branch=master)](https://travis-ci.org/tallstoat/pbparser)
-[![GoReportCard](https://goreportcard.com/badge/github.com/tallstoat/pbparser)](https://goreportcard.com/report/github.com/tallstoat/pbparser)
-[![GoDoc](https://godoc.org/github.com/tallstoat/pbparser?status.svg)](https://godoc.org/github.com/tallstoat/pbparser)
-
 # pbparser
 
 Pbparser is a library for parsing protocol buffer (".proto") files.
@@ -22,13 +18,13 @@ This parser library is meant to address the above mentioned challenges.
 Using pbparser is easy. First, use `go get` to install the latest version of the library. 
 
 ```
-go get -u github.com/tallstoat/pbparser
+go get -u github.com/aristanetworks/pbparser
 ```
 
 Next, include pbparser in your application code.
 
 ```go
-import "github.com/tallstoat/pbparser"
+import "github.com/aristanetworks/pbparser"
 ```
 
 ## APIs
@@ -55,11 +51,11 @@ On the other hand, Clients should use the ParseFile() function if all the import
 
 ## Usage
 
-Please refer to the [examples](https://godoc.org/github.com/tallstoat/pbparser#pkg-examples) for API usage.
+Please refer to the [examples](https://godoc.org/github.com/aristanetworks/pbparser#pkg-examples) for API usage.
 
 ## Issues
 
-If you run into any issues or have enhancement suggestions, please create an issue [here](https://github.com/tallstoat/pbparser/issues).
+If you run into any issues or have enhancement suggestions, please create an issue [here](https://github.com/aristanetworks/pbparser/issues).
 
 However I would much prefer PRs since at this time I'm unable to work on issues :-/
 
@@ -73,5 +69,5 @@ However I would much prefer PRs since at this time I'm unable to work on issues 
 
 ## License
 
-Pbparser is released under the MIT license. See [LICENSE](https://github.com/tallstoat/pbparser/blob/master/LICENSE)
+Pbparser is released under the MIT license. See [LICENSE](https://github.com/aristanetworks/pbparser/blob/master/LICENSE)
 

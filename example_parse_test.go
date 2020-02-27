@@ -1,4 +1,4 @@
-package pbparser_test
+package pbparser
 
 import (
 	"fmt"
@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/tallstoat/pbparser"
 )
 
 // Example code for the Parse() API
@@ -28,7 +26,7 @@ func Example_parse() {
 	pr := DirBasedImportModuleProvider{dir: dir}
 
 	// invoke Parse() API to parse the file
-	pf, err := pbparser.Parse(r, &pr)
+	pf, err := Parse(r, &pr)
 	if err != nil {
 		fmt.Printf("Unable to parse proto file: %v \n", err)
 		os.Exit(-1)

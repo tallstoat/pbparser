@@ -21,25 +21,27 @@ this as nil.
 
 	func ParseFile(file string) (ProtoFile, error)
 
-The ParseFile() function is a utility function which expects the client code to provide only the path
-of the protobuf file. If there are any imports in the protobuf file, the parser will look for them
-in the same directory where the protobuf file resides.
+The ParseFile() function is a utility function which expects the client code to provide only the
+path of the protobuf file. If there are any imports in the protobuf file, the parser will look
+for them in the same directory where the protobuf file resides.
 
 Choosing an API
 
-Clients should use the Parse() function if they are not comfortable with letting the pbparser library
-access the disk directly. This function should also be preferred if the imports in the protobuf file
-are accessible to the client code but the client code does not want to give pbparser direct access to
-them. In such cases, the client code has to construct a ImportModuleProvider instance and pass it to
-the library. This instance must know how to resolve a given "import" and provide a reader for it.
+Clients should use the Parse() function if they are not comfortable with letting the pbparser
+library access the disk directly. This function should also be preferred if the imports in the
+protobuf file are accessible to the client code but the client code does not want to give pbparser
+direct access to them. In such cases, the client code has to construct a ImportModuleProvider
+instance and pass it to the library. This instance must know how to resolve a given "import" and
+provide a reader for it.
 
-On the other hand, Clients should use the ParseFile() function if all the imported files as well as the
-protobuf file are on disk relative to the directory in which the protobuf file resides and they are
-comfortable with letting the pbparser library access the disk directly.
+On the other hand, Clients should use the ParseFile() function if all the imported files as well
+as the protobuf file are on disk relative to the directory in which the protobuf file resides and
+they are comfortable with letting the pbparser library access the disk directly.
 
 ProtoFile datastructure
 
-This datastructure represents parsed model of the given protobuf file. It includes the following information :-
+This datastructure represents parsed model of the given protobuf file. It includes the
+following information :-
 
 	type ProtoFile struct {
 		PackageName        string               // name of the package
@@ -53,15 +55,16 @@ This datastructure represents parsed model of the given protobuf file. It includ
 		ExtendDeclarations []ExtendElement      // any extends directives
 	}
 
-Each attribute in turn has a defined structure, which is explained in the godoc of the corresponding elements.
+Each attribute in turn has a defined structure, which is explained in the godoc of the
+corresponding elements.
 
 Design Considerations
 
 This library consciously chooses to log no information on it's own. Any failures are communicated
 back to client code via the returned Error.
 
-In case of a parsing error, it returns an Error back to the client with a line and column number in the file
-on which the parsing error was encountered.
+In case of a parsing error, it returns an Error back to the client with a line and column number
+in the file on which the parsing error was encountered.
 
 In case of a post-parsing validation error, it returns an Error with enough information to
 identify the erroneous protobuf construct.
