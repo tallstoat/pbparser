@@ -420,6 +420,12 @@ func checkMsgName(m string, msgs []MessageElement) bool {
 		if msg.Name == m {
 			return true
 		}
+		// Recursively check for messages within a message.
+		if len(msg.Messages) > 0 {
+			if checkMsgName(m, msg.Messages) {
+				return true
+			}
+		}
 	}
 	return false
 }
