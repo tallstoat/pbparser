@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 type protoFileOracle struct {
@@ -465,9 +466,34 @@ func validateRPCDataType(
 	return nil
 }
 
+func getPackageName(datatypeName string) string {
+	parts := strings.Split(datatypeName, ".")
+	if len(parts) == 1 {
+		return "" // no package name
+	}
+
+	offset := 0
+	for i, p := range parts {
+		if unicode.IsUpper(rune(p[0])) {
+			break
+		}
+
+		offset += len(p)
+		if i > 0 {
+			offset += 1 // also account for the '.'
+		}
+	}
+
+	return datatypeName[:offset]
+}
+
 func isDatatypeInSamePackage(datatypeName string, packageNames []string) (bool, string) {
+	dtPkg := getPackageName(datatypeName)
+	if len(dtPkg) == 0 {
+		return true, ""
+	}
 	for _, pkg := range packageNames {
-		if strings.HasPrefix(datatypeName, pkg+".") {
+		if pkg == dtPkg {
 			return false, pkg
 		}
 	}
