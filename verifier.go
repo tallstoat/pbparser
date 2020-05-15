@@ -466,6 +466,12 @@ func validateRPCDataType(
 	return nil
 }
 
+// Gets the most-specific package name for the given type name.
+//
+// In order to support nested-message imports like `foo.bar.BazMessage.InnerMessage`
+// the "most specific" check uses the last package segment that is
+// not uppercased as the last package segment. This aligns with
+// naming conventions laid out by Google and most common usage.
 func getPackageName(datatypeName string) string {
 	parts := strings.Split(datatypeName, ".")
 	if len(parts) == 1 {
