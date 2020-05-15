@@ -289,7 +289,7 @@ func TestParseFile(t *testing.T) {
 		fmt.Printf("Parsing file: %v \n", tt.file)
 		pf, err := ParseFile(tt.file)
 		if err != nil {
-			t.Errorf("%v", err.Error())
+			t.Errorf("%s: %v", tt.file, err.Error())
 			continue
 		}
 

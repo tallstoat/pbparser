@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 type protoFileOracle struct {
@@ -465,9 +466,40 @@ func validateRPCDataType(
 	return nil
 }
 
+// Gets the most-specific package name for the given type name.
+//
+// In order to support nested-message imports like `foo.bar.BazMessage.InnerMessage`
+// the "most specific" check uses the last package segment that is
+// not uppercased as the last package segment. This aligns with
+// naming conventions laid out by Google and most common usage.
+func getPackageName(datatypeName string) string {
+	parts := strings.Split(datatypeName, ".")
+	if len(parts) == 1 {
+		return "" // no package name
+	}
+
+	offset := 0
+	for i, p := range parts {
+		if unicode.IsUpper(rune(p[0])) {
+			break
+		}
+
+		offset += len(p)
+		if i > 0 {
+			offset += 1 // also account for the '.'
+		}
+	}
+
+	return datatypeName[:offset]
+}
+
 func isDatatypeInSamePackage(datatypeName string, packageNames []string) (bool, string) {
+	dtPkg := getPackageName(datatypeName)
+	if len(dtPkg) == 0 {
+		return true, ""
+	}
 	for _, pkg := range packageNames {
-		if strings.HasPrefix(datatypeName, pkg+".") {
+		if pkg == dtPkg {
 			return false, pkg
 		}
 	}
