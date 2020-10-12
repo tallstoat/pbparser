@@ -7,7 +7,7 @@ import (
 )
 
 type protoFileOracle struct {
-	pf      *ProtoFile
+	pf      []*ProtoFile
 	msgmap  map[string]bool
 	enummap map[string]bool
 }
@@ -35,7 +35,7 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	}
 
 	// make oracle for main package and add to map...
-	orcl := protoFileOracle{pf: pf}
+	orcl := protoFileOracle{pf: []*ProtoFile{pf}}
 	orcl.msgmap, orcl.enummap = makeQNameLookup(pf)
 	if _, found := m[pf.PackageName]; found {
 		for k, v := range orcl.msgmap {
@@ -46,7 +46,9 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		}
 
 		// update the main model as well in case it is defined across multiple files
-		merge(pf, m[pf.PackageName].pf)
+		for _, mpf := range m[pf.PackageName].pf {
+			merge(pf, mpf)
+		}
 	} else {
 		m[pf.PackageName] = orcl
 	}
@@ -456,16 +458,18 @@ func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[s
 			return err
 		}
 
-		orcl := protoFileOracle{pf: &dpf}
+		orcl := protoFileOracle{pf: []*ProtoFile{&dpf}}
 		orcl.msgmap, orcl.enummap = makeQNameLookup(&dpf)
 
-		if _, found := m[dpf.PackageName]; found {
+		if depOrcl, found := m[dpf.PackageName]; found {
 			for k, v := range orcl.msgmap {
-				m[dpf.PackageName].msgmap[k] = v
+				depOrcl.msgmap[k] = v
 			}
 			for k, v := range orcl.enummap {
-				m[dpf.PackageName].enummap[k] = v
+				depOrcl.enummap[k] = v
 			}
+			depOrcl.pf = append(depOrcl.pf, &dpf)
+			m[dpf.PackageName] = depOrcl
 		} else {
 			m[dpf.PackageName] = orcl
 		}
