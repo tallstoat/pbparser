@@ -1,0 +1,10 @@
+syntax = "proto3";
+package dep;
+
+import "dependency.proto";
+import "dependency3.proto";
+
+message Dependent {
+    SamePackageDependencyMessage field = 1;
+    DifferentMessage field2 = 2;
+}
