@@ -1,0 +1,27 @@
+syntax = "proto3";
+package p;
+message M {
+   message Array {
+       repeated ArrayItem item = 1;
+   }
+   message ArrayItem {
+       oneof item {
+           bool bool = 1;
+           double number = 2;
+           string str = 3;
+       }
+   }
+   message propertyEntry {
+       oneof entry {
+           Array array = 1;
+           bool bool = 2;
+       }
+   }
+   enum levelType {
+       DEBUG = 0;
+       ERROR = 1;
+   }
+   int64 creationDate = 1;
+   levelType level = 2;
+   map<string, propertyEntry> properties = 3;
+}
