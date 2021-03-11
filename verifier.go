@@ -412,7 +412,7 @@ func checkMsgOrEnumName(s string, msgs []MessageElement, enums []EnumElement) bo
 	if checkMsgName(s, msgs) {
 		return true
 	}
-	return checkEnumName(s, enums)
+	return checkEnumName(s, enums, msgs)
 }
 
 func checkMsgName(m string, msgs []MessageElement) bool {
@@ -420,13 +420,23 @@ func checkMsgName(m string, msgs []MessageElement) bool {
 		if msg.Name == m {
 			return true
 		}
+		// try inner definitions
+		if checkMsgName(m, msg.Messages) {
+			return true
+		}
 	}
 	return false
 }
 
-func checkEnumName(s string, enums []EnumElement) bool {
+func checkEnumName(s string, enums []EnumElement, msgs []MessageElement) bool {
 	for _, en := range enums {
 		if en.Name == s {
+			return true
+		}
+	}
+	// try inner definitions
+	for _, msg := range msgs {
+		if checkEnumName(s, msg.Enums, msg.Messages) {
 			return true
 		}
 	}
