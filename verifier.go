@@ -198,6 +198,12 @@ func areImportedPackagesUsed(
 		if checkImportedPackageUsage(pf.Messages, pkg, packageNames) {
 			inuse = true
 		}
+		// check if any extend declarations are referring to this imported package...
+		for _, extension := range pf.ExtendDeclarations {
+			if strings.Contains(extension.Name, pkg) {
+				inuse = true
+			}
+		}
 	LABEL:
 		if !inuse {
 			return errors.New("Imported package: " + pkg + " but not used")
