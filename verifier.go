@@ -3,6 +3,7 @@ package pbparser
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -316,7 +317,13 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 }
 
 func isDatatypeInSamePackage(datatypeName string, packageNames []string) (bool, string) {
-	for _, pkg := range packageNames {
+	sortedPackageNames := make([]string, len(packageNames))
+	copy(sortedPackageNames, packageNames)
+	sort.Slice(sortedPackageNames, func(i, j int) bool {
+		return len(sortedPackageNames[i]) > len(sortedPackageNames[j])
+	})
+
+	for _, pkg := range sortedPackageNames {
 		if strings.HasPrefix(datatypeName, pkg+".") {
 			return false, pkg
 		}
