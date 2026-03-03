@@ -1344,3 +1344,63 @@ func TestRPCTrailingSemicolon(t *testing.T) {
 		t.Errorf("Expected option 'deprecated', got %q", svc.RPCs[1].Options[0].Name)
 	}
 }
+
+func TestExtensionRangeOptions(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/extension_options.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse extension_options.proto: %v", err)
+	}
+
+	if len(pf.Messages) != 3 {
+		t.Fatalf("Expected 3 messages, got %d", len(pf.Messages))
+	}
+
+	// Foo: extensions 100 to 199 [(verify) = LAZY]
+	foo := pf.Messages[0]
+	if len(foo.Extensions) != 1 {
+		t.Fatalf("Expected 1 extension range in Foo, got %d", len(foo.Extensions))
+	}
+	if foo.Extensions[0].Start != 100 || foo.Extensions[0].End != 199 {
+		t.Errorf("Foo ext: expected 100-199, got %d-%d", foo.Extensions[0].Start, foo.Extensions[0].End)
+	}
+	if len(foo.Extensions[0].Options) != 1 {
+		t.Fatalf("Expected 1 option on Foo extension, got %d", len(foo.Extensions[0].Options))
+	}
+	if foo.Extensions[0].Options[0].Name != "verify" || foo.Extensions[0].Options[0].Value != "LAZY" {
+		t.Errorf("Foo ext option: expected verify=LAZY, got %s=%s",
+			foo.Extensions[0].Options[0].Name, foo.Extensions[0].Options[0].Value)
+	}
+
+	// Bar: extensions 10, 20 to 30 [(verify) = LAZY, (declaration) = "true"]
+	// Both ranges should have the same options
+	bar := pf.Messages[1]
+	if len(bar.Extensions) != 2 {
+		t.Fatalf("Expected 2 extension ranges in Bar, got %d", len(bar.Extensions))
+	}
+	if bar.Extensions[0].Start != 10 || bar.Extensions[0].End != 10 {
+		t.Errorf("Bar ext 0: expected 10-10, got %d-%d", bar.Extensions[0].Start, bar.Extensions[0].End)
+	}
+	if bar.Extensions[1].Start != 20 || bar.Extensions[1].End != 30 {
+		t.Errorf("Bar ext 1: expected 20-30, got %d-%d", bar.Extensions[1].Start, bar.Extensions[1].End)
+	}
+	for i, ext := range bar.Extensions {
+		if len(ext.Options) != 2 {
+			t.Fatalf("Bar ext %d: expected 2 options, got %d", i, len(ext.Options))
+		}
+		if ext.Options[0].Name != "verify" || ext.Options[0].Value != "LAZY" {
+			t.Errorf("Bar ext %d opt 0: expected verify=LAZY, got %s=%s", i, ext.Options[0].Name, ext.Options[0].Value)
+		}
+		if ext.Options[1].Name != "declaration" || ext.Options[1].Value != "true" {
+			t.Errorf("Bar ext %d opt 1: expected declaration=true, got %s=%s", i, ext.Options[1].Name, ext.Options[1].Value)
+		}
+	}
+
+	// Baz: extensions 500 to max (no options)
+	baz := pf.Messages[2]
+	if len(baz.Extensions) != 1 {
+		t.Fatalf("Expected 1 extension range in Baz, got %d", len(baz.Extensions))
+	}
+	if len(baz.Extensions[0].Options) != 0 {
+		t.Errorf("Expected 0 options on Baz extension, got %d", len(baz.Extensions[0].Options))
+	}
+}

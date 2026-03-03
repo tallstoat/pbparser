@@ -843,6 +843,7 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 
 	me := ctx.obj.(*MessageElement)
 
+	var ranges []ExtensionsElement
 	for {
 		p.skipWhitespace()
 		start, err := p.readIntLiteral()
@@ -852,12 +853,14 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 
 		xe := ExtensionsElement{Location: p.declLoc, Documentation: documentation, Start: start, End: start}
 
+		p.skipWhitespace()
 		c := p.read()
-		if c == ';' {
-			me.Extensions = append(me.Extensions, xe)
+		if c == ';' || c == '[' {
+			ranges = append(ranges, xe)
+			p.unread()
 			break
 		} else if c == ',' {
-			me.Extensions = append(me.Extensions, xe)
+			ranges = append(ranges, xe)
 		} else {
 			p.unread()
 			p.skipWhitespace()
@@ -877,16 +880,40 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 			}
 			xe.End = end
 
+			p.skipWhitespace()
 			c2 := p.read()
-			if c2 == ';' {
-				me.Extensions = append(me.Extensions, xe)
+			if c2 == ';' || c2 == '[' {
+				ranges = append(ranges, xe)
+				p.unread()
 				break
 			} else if c2 == ',' {
-				me.Extensions = append(me.Extensions, xe)
+				ranges = append(ranges, xe)
 			} else {
 				return p.errline("Expected ',' or ';', but found: %v", strconv.QuoteRune(c2))
 			}
 		}
+	}
+
+	// parse optional compact options: [...] before the semicolon
+	var options []OptionElement
+	p.skipWhitespace()
+	if c := p.read(); c == '[' {
+		var err error
+		if options, err = p.readListOptions(); err != nil {
+			return err
+		}
+		p.skipWhitespace()
+		if c2 := p.read(); c2 != ';' {
+			return p.throw(';', c2)
+		}
+	} else if c != ';' {
+		return p.throw(';', c)
+	}
+
+	// attach options to all ranges and add to message
+	for i := range ranges {
+		ranges[i].Options = options
+		me.Extensions = append(me.Extensions, ranges[i])
 	}
 	return nil
 }

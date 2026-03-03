@@ -1,0 +1,17 @@
+syntax = "proto2";
+package extoptpkg;
+
+message Foo {
+  required int32 id = 1;
+  extensions 100 to 199 [(verify) = LAZY];
+}
+
+message Bar {
+  required int32 id = 1;
+  extensions 10, 20 to 30 [(verify) = LAZY, (declaration) = "true"];
+}
+
+message Baz {
+  required int32 id = 1;
+  extensions 500 to max;
+}

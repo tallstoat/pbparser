@@ -103,6 +103,7 @@ type OneOfElement struct {
 type ExtensionsElement struct {
 	Location      SourceLocation
 	Documentation string
+	Options       []OptionElement
 	Start         int
 	End           int
 }
