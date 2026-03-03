@@ -1400,6 +1400,19 @@ func (p *parser) readUntil(delimiter rune) string {
 				break
 			}
 			_, _ = buf.WriteRune(c2)
+			// consume additional characters for multi-char escapes
+			switch c2 {
+			case 'x': // \xHH - exactly 2 hex digits
+				p.readEscapeHexDigits(&buf, 2)
+			case 'u': // \uHHHH - exactly 4 hex digits
+				p.readEscapeHexDigits(&buf, 4)
+			case 'U': // \UHHHHHHHH - exactly 8 hex digits
+				p.readEscapeHexDigits(&buf, 8)
+			default:
+				if isOctalDigit(c2) { // \NNN - up to 2 more octal digits
+					p.readEscapeOctalDigits(&buf)
+				}
+			}
 			continue
 		}
 		if c == delimiter {
@@ -1408,6 +1421,36 @@ func (p *parser) readUntil(delimiter rune) string {
 		_, _ = buf.WriteRune(c)
 	}
 	return buf.String()
+}
+
+// readEscapeHexDigits reads up to n hex digits for a \x, \u, or \U escape
+// and appends them to the buffer.
+func (p *parser) readEscapeHexDigits(buf *bytes.Buffer, n int) {
+	for i := 0; i < n; i++ {
+		c := p.read()
+		if c == eof || !isHexDigit(c) {
+			p.unread()
+			break
+		}
+		_, _ = buf.WriteRune(c)
+	}
+}
+
+// readEscapeOctalDigits reads up to 2 more octal digits after the first
+// octal digit of a \NNN escape and appends them to the buffer.
+func (p *parser) readEscapeOctalDigits(buf *bytes.Buffer) {
+	for i := 0; i < 2; i++ {
+		c := p.read()
+		if c == eof || !isOctalDigit(c) {
+			p.unread()
+			break
+		}
+		_, _ = buf.WriteRune(c)
+	}
+}
+
+func isOctalDigit(c rune) bool {
+	return c >= '0' && c <= '7'
 }
 
 func (p *parser) readUntilNewline() string {

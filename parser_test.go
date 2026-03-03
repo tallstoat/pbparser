@@ -1232,3 +1232,43 @@ func TestSingleQuotedStrings(t *testing.T) {
 		t.Errorf("Expected reserved name 'OLD_NAME', got %v", enum.ReservedNames)
 	}
 }
+
+func TestUnicodeHexEscapes(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/unicode_escape.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse unicode_escape.proto: %v", err)
+	}
+
+	// File-level options with various escape sequences preserved as raw text
+	expectedOpts := []struct {
+		name  string
+		value string
+	}{
+		{"hex_opt", `tab\x09here`},
+		{"unicode_opt", `smile\u263Aface`},
+		{"big_unicode_opt", `big\U0001F600end`},
+		{"octal_opt", `bell\007end`},
+		{"mixed_opt", `a\nb\tc\x41d`},
+	}
+	if len(pf.Options) != len(expectedOpts) {
+		t.Fatalf("Expected %d file options, got %d", len(expectedOpts), len(pf.Options))
+	}
+	for i, o := range pf.Options {
+		if o.Name != expectedOpts[i].name {
+			t.Errorf("Option %d: expected name %q, got %q", i, expectedOpts[i].name, o.Name)
+		}
+		if o.Value != expectedOpts[i].value {
+			t.Errorf("Option %q: expected value %q, got %q", expectedOpts[i].name, expectedOpts[i].value, o.Value)
+		}
+	}
+
+	// Field option with hex escapes
+	msg := pf.Messages[0]
+	if len(msg.Fields[0].Options) != 1 {
+		t.Fatalf("Expected 1 field option, got %d", len(msg.Fields[0].Options))
+	}
+	expectedFieldOpt := `\x48\x65\x6C\x6Co`
+	if msg.Fields[0].Options[0].Value != expectedFieldOpt {
+		t.Errorf("Expected field option value %q, got %q", expectedFieldOpt, msg.Fields[0].Options[0].Value)
+	}
+}
