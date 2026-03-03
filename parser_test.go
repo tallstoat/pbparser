@@ -60,6 +60,7 @@ func TestParseErrors(t *testing.T) {
 		{file: "dup-enum-constant.proto", expectedErrors: []string{"Enum constant", "is already defined in package missing"}},
 		{file: "enum-constant-same-tag.proto", expectedErrors: []string{"is reusing an enum value. If this is intended, set 'option allow_alias = true;'"}},
 		{file: "wrong-enum-constant-tag.proto", expectedErrors: []string{"Unable to read tag for Enum Constant: UNKNOWN"}},
+		{file: "enum-first-value-not-zero.proto", expectedErrors: []string{"The first enum value of 'Status' must be 0 in proto3"}},
 		{file: "field-tag-out-of-range.proto", expectedErrors: []string{"Field number 0 is out of range"}},
 		{file: "field-tag-reserved-range.proto", expectedErrors: []string{"Field number 19500 is in the reserved range 19000 to 19999"}},
 		{file: "field-tag-too-large.proto", expectedErrors: []string{"Field number 536870912 is out of range"}},

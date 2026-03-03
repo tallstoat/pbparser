@@ -1,0 +1,7 @@
+syntax = "proto3";
+package test;
+
+enum Status {
+  ACTIVE = 1;
+  INACTIVE = 2;
+}

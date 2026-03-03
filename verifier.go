@@ -111,7 +111,17 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		}
 	}
 
-	// TODO: add more checks here if needed
+	// in proto3, the first enum value must be zero
+	if pf.Syntax == "proto3" {
+		if err := validateEnumFirstValueZero(pf.Enums); err != nil {
+			return err
+		}
+		for _, msg := range pf.Messages {
+			if err := validateEnumFirstValueZeroInMessage(msg); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
@@ -625,4 +635,25 @@ func parseWeakDependencies(impr ImportModuleProvider, dependencies []string, m m
 			m[dpf.PackageName] = orcl
 		}
 	}
+}
+
+func validateEnumFirstValueZero(enums []EnumElement) error {
+	for _, en := range enums {
+		if len(en.EnumConstants) > 0 && en.EnumConstants[0].Tag != 0 {
+			return fmt.Errorf("The first enum value of '%v' must be 0 in proto3", en.Name)
+		}
+	}
+	return nil
+}
+
+func validateEnumFirstValueZeroInMessage(msg MessageElement) error {
+	if err := validateEnumFirstValueZero(msg.Enums); err != nil {
+		return err
+	}
+	for _, nestedmsg := range msg.Messages {
+		if err := validateEnumFirstValueZeroInMessage(nestedmsg); err != nil {
+			return err
+		}
+	}
+	return nil
 }
