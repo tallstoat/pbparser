@@ -1274,3 +1274,38 @@ func TestUnicodeHexEscapes(t *testing.T) {
 		t.Errorf("Expected field option value %q, got %q", expectedFieldOpt, msg.Fields[0].Options[0].Value)
 	}
 }
+
+func TestStringConcatenation(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/string_concat.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse string_concat.proto: %v", err)
+	}
+
+	// File-level option with concatenated value
+	if len(pf.Options) != 1 {
+		t.Fatalf("Expected 1 file option, got %d", len(pf.Options))
+	}
+	if pf.Options[0].Value != "com.example.stringconcat" {
+		t.Errorf("Expected option value 'com.example.stringconcat', got %q", pf.Options[0].Value)
+	}
+
+	// Field option with three concatenated strings
+	msg := pf.Messages[0]
+	if len(msg.Fields[0].Options) != 1 {
+		t.Fatalf("Expected 1 field option, got %d", len(msg.Fields[0].Options))
+	}
+	if msg.Fields[0].Options[0].Value != "hello world" {
+		t.Errorf("Expected field option value 'hello world', got %q", msg.Fields[0].Options[0].Value)
+	}
+
+	// Reserved names with concatenated strings
+	if len(msg.ReservedNames) != 2 {
+		t.Fatalf("Expected 2 reserved names, got %d", len(msg.ReservedNames))
+	}
+	if msg.ReservedNames[0] != "field_afield_b" {
+		t.Errorf("Expected reserved name 'field_afield_b', got %q", msg.ReservedNames[0])
+	}
+	if msg.ReservedNames[1] != "field_c" {
+		t.Errorf("Expected reserved name 'field_c', got %q", msg.ReservedNames[1])
+	}
+}

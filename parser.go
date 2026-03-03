@@ -713,6 +713,17 @@ func (p *parser) readOptionValue(oe *OptionElement) error {
 	c := p.read()
 	if c == '"' || c == '\'' {
 		oe.Value = p.readUntil(c)
+		// support string concatenation: "hello" " world" => "hello world"
+		for {
+			p.skipWhitespace()
+			c2 := p.read()
+			if c2 == '"' || c2 == '\'' {
+				oe.Value += p.readUntil(c2)
+			} else {
+				p.unread()
+				break
+			}
+		}
 	} else if c == '{' {
 		val, err := p.readAggregateValue()
 		if err != nil {
@@ -1155,6 +1166,21 @@ func (p *parser) readQuotedString(f func(r rune) bool) (string, error) {
 	str := p.readUntil(quote)
 	if p.eofReached {
 		return "", p.errline("Unterminated string literal")
+	}
+
+	// support string concatenation: "hello" " world" => "hello world"
+	for {
+		p.skipWhitespace()
+		c := p.read()
+		if c == '"' || c == '\'' {
+			str += p.readUntil(c)
+			if p.eofReached {
+				return "", p.errline("Unterminated string literal")
+			}
+		} else {
+			p.unread()
+			break
+		}
 	}
 	return str, nil
 }

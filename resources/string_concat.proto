@@ -1,0 +1,11 @@
+syntax = "proto2";
+package stringconcatpkg;
+
+option java_package = "com.example."
+                      "stringconcat";
+
+message Foo {
+  optional string name = 1 [default = "hello" " " "world"];
+  optional int32 id = 2;
+  reserved "field_a" "field_b", "field_c";
+}
