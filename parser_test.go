@@ -1119,3 +1119,37 @@ func TestFloatOptionValues(t *testing.T) {
 		t.Errorf("Expected field option value '+100', got %q", msg.Fields[0].Options[0].Value)
 	}
 }
+
+func TestLeadingDotTypeNames(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/leading_dot.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse leading_dot.proto: %v", err)
+	}
+
+	// Message field with leading-dot type reference
+	outer := pf.Messages[1]
+	if outer.Name != "Outer" {
+		t.Fatalf("Expected message 'Outer', got %q", outer.Name)
+	}
+	if len(outer.Fields) != 2 {
+		t.Fatalf("Expected 2 fields, got %d", len(outer.Fields))
+	}
+	if outer.Fields[0].Type.Name() != ".leadingdotpkg.Inner" {
+		t.Errorf("Expected type '.leadingdotpkg.Inner', got %q", outer.Fields[0].Type.Name())
+	}
+	if outer.Fields[1].Type.Name() != ".leadingdotpkg.Status" {
+		t.Errorf("Expected type '.leadingdotpkg.Status', got %q", outer.Fields[1].Type.Name())
+	}
+
+	// RPC with leading-dot type references
+	if len(pf.Services) != 1 {
+		t.Fatalf("Expected 1 service, got %d", len(pf.Services))
+	}
+	rpc := pf.Services[0].RPCs[0]
+	if rpc.RequestType.Name() != ".leadingdotpkg.Inner" {
+		t.Errorf("Expected request type '.leadingdotpkg.Inner', got %q", rpc.RequestType.Name())
+	}
+	if rpc.ResponseType.Name() != ".leadingdotpkg.Inner" {
+		t.Errorf("Expected response type '.leadingdotpkg.Inner', got %q", rpc.ResponseType.Name())
+	}
+}

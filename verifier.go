@@ -200,6 +200,9 @@ func checkImportedPackageUsage(msgs []MessageElement, pkg string, packageNames [
 }
 
 func usesPackage(s string, pkg string, packageNames []string) bool {
+	if strings.HasPrefix(s, ".") {
+		s = s[1:]
+	}
 	if strings.ContainsRune(s, '.') {
 		inSamePkg, pkgName := isDatatypeInSamePackage(s, packageNames)
 		if !inSamePkg && pkg == pkgName {
@@ -437,6 +440,11 @@ func findFieldsToValidate(msgs []MessageElement, fields *[]fd) {
 }
 
 func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums []EnumElement, m map[string]protoFileOracle, packageNames []string) error {
+	// Strip leading dot from fully-qualified type names (e.g. ".pkg.Type" -> "pkg.Type")
+	if strings.HasPrefix(f.category, ".") {
+		f.category = f.category[1:]
+	}
+
 	var found bool
 	if strings.ContainsRune(f.category, '.') {
 		inSamePkg, pkgName := isDatatypeInSamePackage(f.category, packageNames)
@@ -500,23 +508,35 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 }
 
 func validateRPCDataType(mainpkg string, service string, rpc string, datatype NamedDataType, msgs []MessageElement, m map[string]protoFileOracle, packageNames []string) error {
+	// Strip leading dot from fully-qualified type names (e.g. ".pkg.Type" -> "pkg.Type")
+	dtName := datatype.Name()
+	if strings.HasPrefix(dtName, ".") {
+		dtName = dtName[1:]
+	}
+
 	var found bool
-	if strings.ContainsRune(datatype.Name(), '.') {
-		inSamePkg, pkgName := isDatatypeInSamePackage(datatype.Name(), packageNames)
+	if strings.ContainsRune(dtName, '.') {
+		inSamePkg, pkgName := isDatatypeInSamePackage(dtName, packageNames)
 		if inSamePkg {
 			// Check against normal as well as nested types in same package
 			orcl := m[mainpkg]
-			found = orcl.msgmap[mainpkg+"."+datatype.Name()]
+			var matchTerm string
+			if strings.HasPrefix(dtName, mainpkg+".") {
+				matchTerm = dtName
+			} else {
+				matchTerm = mainpkg + "." + dtName
+			}
+			found = orcl.msgmap[matchTerm]
 		} else {
 			orcl := m[pkgName]
 			// Check against normal and nested messages & enums in dependency package
-			found = orcl.msgmap[datatype.Name()]
+			found = orcl.msgmap[dtName]
 		}
 	} else {
-		found = checkMsgName(datatype.Name(), msgs)
+		found = checkMsgName(dtName, msgs)
 	}
 	if !found {
-		msg := fmt.Sprintf("Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message type", datatype.Name(), rpc, service)
+		msg := fmt.Sprintf("Datatype: '%v' referenced in RPC: '%v' of Service: '%v' is not defined OR is not a message type", dtName, rpc, service)
 		return errors.New(msg)
 	}
 	return nil

@@ -1,0 +1,20 @@
+syntax = "proto3";
+package leadingdotpkg;
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+}
+
+message Inner {
+  int32 id = 1;
+}
+
+message Outer {
+  .leadingdotpkg.Inner nested = 1;
+  .leadingdotpkg.Status status = 2;
+}
+
+service MyService {
+  rpc GetInner (.leadingdotpkg.Inner) returns (.leadingdotpkg.Inner);
+}
