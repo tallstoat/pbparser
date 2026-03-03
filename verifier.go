@@ -12,6 +12,9 @@ type protoFileOracle struct {
 	enummap map[string]struct{}
 }
 
+// verify validates the parsed ProtoFile for correctness. It checks syntax,
+// resolves and validates imports, ensures all referenced types are defined,
+// and enforces protobuf constraints such as unique names and enum rules.
 func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	// validate syntax
 	if err := validateSyntaxOrEdition(pf); err != nil {
@@ -90,6 +93,8 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	return nil
 }
 
+// mergeOracle adds the given oracle's message and enum maps into the existing
+// oracle for the package. If no oracle exists yet, it inserts a new entry.
 func mergeOracle(m map[string]protoFileOracle, packageName string, orcl protoFileOracle) {
 	if existing, found := m[packageName]; found {
 		for k := range orcl.msgmap {
@@ -116,6 +121,8 @@ func merge(dest *ProtoFile, src *ProtoFile) {
 	dest.ExtendDeclarations = append(dest.ExtendDeclarations, src.ExtendDeclarations...)
 }
 
+// areImportedPackagesUsed returns an error if any imported dependency package
+// is not referenced by any type or option in the ProtoFile.
 func areImportedPackagesUsed(pf *ProtoFile, packageNames []string) error {
 	used := collectReferencedPackages(pf, packageNames)
 	for _, pkg := range packageNames {
@@ -152,6 +159,8 @@ func collectReferencedPackages(pf *ProtoFile, packageNames []string) map[string]
 	return used
 }
 
+// addUsedPackage checks if typeName belongs to a dependency package and, if so,
+// records that package as used.
 func addUsedPackage(typeName string, packageNames []string, used map[string]struct{}) {
 	if strings.HasPrefix(typeName, ".") {
 		typeName = typeName[1:]
@@ -164,6 +173,8 @@ func addUsedPackage(typeName string, packageNames []string, used map[string]stru
 	}
 }
 
+// collectFieldPackages recursively walks message fields and records which
+// dependency packages are referenced by named field types.
 func collectFieldPackages(msgs []MessageElement, packageNames []string, used map[string]struct{}) {
 	for _, msg := range msgs {
 		for _, f := range msg.Fields {
@@ -177,6 +188,8 @@ func collectFieldPackages(msgs []MessageElement, packageNames []string, used map
 	}
 }
 
+// collectOptionPackages records dependency packages referenced by parenthesized
+// (custom) option names.
 func collectOptionPackages(opts []OptionElement, packageNames []string, used map[string]struct{}) {
 	for _, opt := range opts {
 		if opt.IsParenthesized && strings.ContainsRune(opt.Name, '.') {
@@ -185,6 +198,8 @@ func collectOptionPackages(opts []OptionElement, packageNames []string, used map
 	}
 }
 
+// collectMessageOptionPackages recursively walks messages, their fields, and
+// oneofs to record dependency packages referenced by options at each level.
 func collectMessageOptionPackages(msgs []MessageElement, packageNames []string, used map[string]struct{}) {
 	for _, msg := range msgs {
 		collectOptionPackages(msg.Options, packageNames, used)
@@ -204,6 +219,8 @@ func collectMessageOptionPackages(msgs []MessageElement, packageNames []string, 
 	}
 }
 
+// collectEnumOptionPackages records dependency packages referenced by options
+// on enums and their individual constants.
 func collectEnumOptionPackages(enums []EnumElement, packageNames []string, used map[string]struct{}) {
 	for _, en := range enums {
 		collectOptionPackages(en.Options, packageNames, used)
@@ -213,6 +230,9 @@ func collectEnumOptionPackages(enums []EnumElement, packageNames []string, used 
 	}
 }
 
+// validateUniqueMessageEnumNames ensures that all message and enum names are
+// unique within the given scope (package or enclosing message), recursing into
+// nested messages.
 func validateUniqueMessageEnumNames(ctxName string, enums []EnumElement, msgs []MessageElement) error {
 	m := make(map[string]struct{})
 	for _, en := range enums {
@@ -235,6 +255,8 @@ func validateUniqueMessageEnumNames(ctxName string, enums []EnumElement, msgs []
 	return nil
 }
 
+// validateEnumConstantTagAliases returns an error if an enum reuses a numeric
+// tag value without the allow_alias option set to true.
 func validateEnumConstantTagAliases(enums []EnumElement) error {
 	for _, en := range enums {
 		m := make(map[int]struct{})
@@ -250,6 +272,8 @@ func validateEnumConstantTagAliases(enums []EnumElement) error {
 	return nil
 }
 
+// forEachMessageRecursive applies fn to every message in the tree, depth-first.
+// It returns the first error encountered, if any.
 func forEachMessageRecursive(msgs []MessageElement, fn func(MessageElement) error) error {
 	for _, msg := range msgs {
 		if err := fn(msg); err != nil {
@@ -262,6 +286,7 @@ func forEachMessageRecursive(msgs []MessageElement, fn func(MessageElement) erro
 	return nil
 }
 
+// isAllowAlias reports whether the enum has the allow_alias option set to true.
 func isAllowAlias(en *EnumElement) bool {
 	for _, op := range en.Options {
 		if op.Name == "allow_alias" && op.Value == "true" {
@@ -271,6 +296,8 @@ func isAllowAlias(en *EnumElement) bool {
 	return false
 }
 
+// validateAllEnums checks all enum constraints across the ProtoFile: unique
+// constant names, tag alias rules, and the proto3 first-value-zero requirement.
 func validateAllEnums(pf *ProtoFile) error {
 	isProto3 := pf.Syntax == "proto3"
 
@@ -304,6 +331,8 @@ func validateAllEnums(pf *ProtoFile) error {
 	})
 }
 
+// validateEnumConstants returns an error if any enum constant name is defined
+// more than once within the given scope.
 func validateEnumConstants(ctxName string, enums []EnumElement) error {
 	m := make(map[string]struct{})
 	for _, en := range enums {
@@ -317,6 +346,8 @@ func validateEnumConstants(ctxName string, enums []EnumElement) error {
 	return nil
 }
 
+// validateSyntaxOrEdition returns an error if neither syntax nor edition is
+// specified in the proto file.
 func validateSyntaxOrEdition(pf *ProtoFile) error {
 	if pf.Syntax == "" && pf.Edition == "" {
 		return errors.New("No syntax or edition specified in the proto file")
@@ -324,6 +355,8 @@ func validateSyntaxOrEdition(pf *ProtoFile) error {
 	return nil
 }
 
+// getDependencyPackageNames returns the package names from the oracle map,
+// excluding the main package.
 func getDependencyPackageNames(mainPkgName string, m map[string]protoFileOracle) []string {
 	var keys []string
 	for k := range m {
@@ -335,6 +368,8 @@ func getDependencyPackageNames(mainPkgName string, m map[string]protoFileOracle)
 	return keys
 }
 
+// makeQNameLookup builds lookup maps of fully-qualified message and enum names
+// from the given ProtoFile, including all nested types.
 func makeQNameLookup(dpf *ProtoFile) (map[string]struct{}, map[string]struct{}) {
 	msgmap := make(map[string]struct{})
 	enummap := make(map[string]struct{})
@@ -348,6 +383,8 @@ func makeQNameLookup(dpf *ProtoFile) (map[string]struct{}, map[string]struct{}) 
 	return msgmap, enummap
 }
 
+// gatherNestedQNames recursively collects qualified names of nested messages
+// and enums into the provided lookup maps.
 func gatherNestedQNames(parentmsg MessageElement, msgmap map[string]struct{}, enummap map[string]struct{}) {
 	for _, nestedmsg := range parentmsg.Messages {
 		msgmap[nestedmsg.QualifiedName] = struct{}{}
@@ -364,6 +401,9 @@ type fieldTypeRef struct {
 	msg      *MessageElement
 }
 
+// validateFieldsRecursive walks all messages (including nested ones) and
+// verifies that every field with a named data type references a type that is
+// defined in the model or its dependencies.
 func validateFieldsRecursive(mainpkg string, msgs []MessageElement, topMsgs []MessageElement, topEnums []EnumElement, m map[string]protoFileOracle, packageNames []string) error {
 	for i := range msgs {
 		for _, f := range msgs[i].Fields {
@@ -409,6 +449,9 @@ func resolveTypeName(mainpkg string, typeName string, m map[string]protoFileOrac
 	return
 }
 
+// validateFieldDataTypes checks that a single field's named type is resolvable.
+// It handles fully-qualified names, relative lookups within the enclosing message
+// scope chain, and top-level package lookups.
 func validateFieldDataTypes(mainpkg string, f fieldTypeRef, msgs []MessageElement, enums []EnumElement, m map[string]protoFileOracle, packageNames []string) error {
 	// Strip leading dot from fully-qualified type names (e.g. ".pkg.Type" -> "pkg.Type")
 	if strings.HasPrefix(f.typeName, ".") {
@@ -472,6 +515,8 @@ func validateFieldDataTypes(mainpkg string, f fieldTypeRef, msgs []MessageElemen
 	return nil
 }
 
+// validateRPCDataType verifies that an RPC request or response type is defined
+// as a message in the model or its dependencies.
 func validateRPCDataType(mainpkg string, service string, rpc string, datatype NamedDataType, m map[string]protoFileOracle, packageNames []string) error {
 	// Strip leading dot from fully-qualified type names (e.g. ".pkg.Type" -> "pkg.Type")
 	dtName := datatype.Name()
@@ -492,6 +537,9 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 	return nil
 }
 
+// isDatatypeInSamePackage checks whether a qualified type name belongs to one
+// of the dependency packages. It returns false and the matching package name if
+// found, or true (same package) with an empty string if no dependency matches.
 func isDatatypeInSamePackage(datatypeName string, packageNames []string) (bool, string) {
 	// Match the longest (most specific) package name to handle nested
 	// packages correctly (e.g., prefer "a.b.c" over "a.b" for type "a.b.c.Foo").
@@ -525,6 +573,8 @@ func matchMsgOrEnumName(name string, msgs []MessageElement, enums []EnumElement)
 	return false
 }
 
+// parseDependency uses the ImportModuleProvider to read and parse a single
+// dependency proto file, then adds its types to the oracle map.
 func parseDependency(impr ImportModuleProvider, d string, m map[string]protoFileOracle) error {
 	r, err := impr.Provide(d)
 	if err != nil {
@@ -549,6 +599,8 @@ func parseDependency(impr ImportModuleProvider, d string, m map[string]protoFile
 	return nil
 }
 
+// parseDependencies parses each dependency in the list, returning the first
+// error encountered.
 func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[string]protoFileOracle) error {
 	for _, d := range dependencies {
 		if err := parseDependency(impr, d, m); err != nil {
@@ -558,6 +610,8 @@ func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[s
 	return nil
 }
 
+// parseWeakDependencies attempts to parse each weak dependency but silently
+// ignores any failures, since weak imports are optional.
 func parseWeakDependencies(impr ImportModuleProvider, dependencies []string, m map[string]protoFileOracle) {
 	for _, d := range dependencies {
 		// weak imports are optional; skip if unavailable or unparseable
@@ -565,6 +619,8 @@ func parseWeakDependencies(impr ImportModuleProvider, dependencies []string, m m
 	}
 }
 
+// validateEnumFirstValueZero enforces the proto3 requirement that the first
+// enum constant must have a tag value of 0.
 func validateEnumFirstValueZero(enums []EnumElement) error {
 	for _, en := range enums {
 		if len(en.EnumConstants) > 0 && en.EnumConstants[0].Tag != 0 {
@@ -574,6 +630,8 @@ func validateEnumFirstValueZero(enums []EnumElement) error {
 	return nil
 }
 
+// validateNoMapInOneOf returns an error if any oneof in the message contains
+// a map field, which is disallowed by the protobuf specification.
 func validateNoMapInOneOf(msg MessageElement) error {
 	for _, oo := range msg.OneOfs {
 		for _, f := range oo.Fields {
