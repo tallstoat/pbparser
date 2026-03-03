@@ -11,7 +11,7 @@ import (
 //
 // The import module could be on disk or elsewhere. In order for the pbparser library to not be tied in
 // to a specific method of reading the import modules, it exposes this interface to the clients. The clients
-// must provide a implementation of this interface which knows how to interpret the module string & returns a
+// must provide an implementation of this interface which knows how to interpret the module string & returns a
 // reader for the module. This is needed if the client is calling the Parse() function of the pbparser library.
 //
 // If the client knows the import modules are on disk, they can instead call the ParseFile() function which

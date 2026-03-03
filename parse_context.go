@@ -32,37 +32,37 @@ var ctxTypeToStringMap = [...]string{
 	serviceCtx: "service",
 }
 
-// the veritable tostring() for java lovers...
+// String returns the human-readable name of the parse context type.
 func (pc parseCtx) String() string {
 	return ctxTypeToStringMap[pc.ctxType]
 }
 
-// does this ctx permit package support?
+// permitsPackage reports whether this context permits package declarations.
 func (pc parseCtx) permitsPackage() bool {
 	return pc.ctxType == fileCtx
 }
 
-// does this ctx permit syntax support?
+// permitsSyntax reports whether this context permits syntax declarations.
 func (pc parseCtx) permitsSyntax() bool {
 	return pc.ctxType == fileCtx
 }
 
-// does this ctx permit edition support?
+// permitsEdition reports whether this context permits edition declarations.
 func (pc parseCtx) permitsEdition() bool {
 	return pc.ctxType == fileCtx
 }
 
-// does this ctx permit import support?
+// permitsImport reports whether this context permits import declarations.
 func (pc parseCtx) permitsImport() bool {
 	return pc.ctxType == fileCtx
 }
 
-// does this ctx permit field support?
+// permitsField reports whether this context permits field declarations.
 func (pc parseCtx) permitsField() bool {
 	return pc.ctxType == msgCtx || pc.ctxType == oneOfCtx || pc.ctxType == extendCtx
 }
 
-// does this ctx permit option?
+// permitsOption reports whether this context permits option declarations.
 func (pc parseCtx) permitsOption() bool {
 	return pc.ctxType == fileCtx ||
 		pc.ctxType == msgCtx ||
@@ -72,37 +72,37 @@ func (pc parseCtx) permitsOption() bool {
 		pc.ctxType == rpcCtx
 }
 
-// does this ctx permit extensions support?
+// permitsExtensions reports whether this context permits extensions declarations.
 func (pc parseCtx) permitsExtensions() bool {
 	return pc.ctxType == msgCtx
 }
 
-// does this ctx permit extend declarations?
+// permitsExtend reports whether this context permits extend declarations.
 func (pc parseCtx) permitsExtend() bool {
 	return pc.ctxType == fileCtx || pc.ctxType == msgCtx
 }
 
-// does this ctx permit reserved keyword support?
+// permitsReserved reports whether this context permits reserved declarations.
 func (pc parseCtx) permitsReserved() bool {
 	return pc.ctxType == msgCtx || pc.ctxType == enumCtx
 }
 
-// does this ctx permit rpc support?
+// permitsRPC reports whether this context permits RPC declarations.
 func (pc parseCtx) permitsRPC() bool {
 	return pc.ctxType == serviceCtx
 }
 
-// does this ctx permit OneOf support?
+// permitsOneOf reports whether this context permits oneof declarations.
 func (pc parseCtx) permitsOneOf() bool {
 	return pc.ctxType == msgCtx
 }
 
-// does this ctx permit enum support?
+// permitsEnum reports whether this context permits enum declarations.
 func (pc parseCtx) permitsEnum() bool {
 	return pc.ctxType == fileCtx || pc.ctxType == msgCtx
 }
 
-// does this ctx permit msg support?
+// permitsMsg reports whether this context permits message declarations.
 func (pc parseCtx) permitsMsg() bool {
 	return pc.ctxType == fileCtx || pc.ctxType == msgCtx
 }

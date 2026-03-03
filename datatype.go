@@ -135,7 +135,3 @@ func (ndt NamedDataType) IsStream() bool {
 	return ndt.supportsStreaming
 }
 
-// stream marks a NamedDataType as being preceded by a Stream keyword.
-func (ndt *NamedDataType) stream(flag bool) {
-	ndt.supportsStreaming = flag
-}

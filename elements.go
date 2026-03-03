@@ -58,7 +58,7 @@ type RPCElement struct {
 
 // ServiceElement is a datastructure which models
 // the service construct in a protobuf file. Service
-// construct defines the rpcs (apis) for the service.
+// construct defines the RPCs (APIs) for the service.
 type ServiceElement struct {
 	Location      SourceLocation
 	Name          string
@@ -83,7 +83,7 @@ type FieldElement struct {
 }
 
 // OneOfElement is a datastructure which models
-// a oneoff construct in a protobuf file. All the fields in a
+// a oneof construct in a protobuf file. All the fields in a
 // oneof construct share memory, and at most one field can be
 // set at any time.
 type OneOfElement struct {
@@ -163,8 +163,8 @@ type ExtendElement struct {
 // ProtoFile is a datastructure which represents the parsed model
 // of the given protobuf file.
 //
-// It includes the package name, the syntax, the import dependencies,
-// any public import dependencies, any options, enums, messages, services,
+// It includes the package name, the syntax or edition, the import dependencies
+// (regular, public, and weak), any options, enums, messages, services,
 // extension declarations etc.
 //
 // This is populated by the parser & post-validation returned to the

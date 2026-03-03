@@ -218,7 +218,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	dataTypeStr := label
 	if label == required || label == optional || label == repeated {
 		if ctx.ctxType == oneOfCtx {
-			return p.errline("Label '%v' is disallowed in oneoff field", label)
+			return p.errline("Label '%v' is disallowed in oneof field", label)
 		}
 		fe.Label = label
 		p.skipWhitespace()
@@ -786,7 +786,6 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 		return p.throw('(', c)
 	}
 
-	// var requestType, responseType NamedDataType
 	rpc := RPCElement{Location: p.declLoc, Name: name, Documentation: documentation}
 
 	// parse request type...
