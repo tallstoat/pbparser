@@ -1,0 +1,6 @@
+syntax = "proto3";
+package defaultproto3;
+
+message Foo {
+  string name = 1 [default = "hello"];
+}

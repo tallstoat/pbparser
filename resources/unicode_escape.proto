@@ -8,6 +8,6 @@ option (octal_opt) = "bell\007end";
 option (mixed_opt) = "a\nb\tc\x41d";
 
 message Foo {
-  string name = 1 [default = "\x48\x65\x6C\x6Co"];
+  string name = 1 [(label) = "\x48\x65\x6C\x6Co"];
   int32 id = 2;
 }

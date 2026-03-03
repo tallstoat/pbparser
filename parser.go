@@ -530,6 +530,15 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		return err
 	}
 
+	// reject 'default' option in proto3
+	if pf.Syntax == proto3 {
+		for _, opt := range fe.Options {
+			if opt.Name == "default" {
+				return p.errline("Default values are not allowed in proto3")
+			}
+		}
+	}
+
 	// add field to the proper parent	...
 	if ctx.ctxType == msgCtx {
 		me := ctx.obj.(*MessageElement)

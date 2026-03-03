@@ -1,8 +1,8 @@
-syntax = "proto3";
+syntax = "proto2";
 package stringescapepkg;
 
 option (my_file_opt) = "hello \"world\"";
 
 message Foo {
-  string name = 1 [default = "say \"hi\\n\""];
+  optional string name = 1 [default = "say \"hi\\n\""];
 }

@@ -102,6 +102,7 @@ func TestParseErrors(t *testing.T) {
 		{file: "syntax-and-edition.proto", expectedErrors: []string{"Cannot specify both 'syntax' and 'edition'"}},
 		{file: "group-in-proto3.proto", expectedErrors: []string{"Groups are not allowed in proto3 or editions"}},
 		{file: "extensions-in-proto3.proto", expectedErrors: []string{"Extension ranges are not allowed in proto3"}},
+		{file: "default-in-proto3.proto", expectedErrors: []string{"Default values are not allowed in proto3"}},
 	}
 
 	for _, tt := range tests {
@@ -1198,8 +1199,8 @@ func TestSingleQuotedStrings(t *testing.T) {
 	}
 
 	// Syntax parsed from single-quoted string
-	if pf.Syntax != "proto3" {
-		t.Errorf("Expected syntax 'proto3', got %q", pf.Syntax)
+	if pf.Syntax != "proto2" {
+		t.Errorf("Expected syntax 'proto2', got %q", pf.Syntax)
 	}
 
 	// Package
