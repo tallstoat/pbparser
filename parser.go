@@ -268,22 +268,23 @@ func (p *parser) readDeclarationsInLoop(pf *ProtoFile, ctx parseCtx) error {
 }
 
 func (p *parser) readReserved(pf *ProtoFile, documentation string, ctx parseCtx) error {
-	me := ctx.obj.(*MessageElement)
-
 	p.skipWhitespace()
 	c := p.read()
 	p.unread()
 
-	if isDigit(c) {
-		if err := p.readReservedRanges(documentation, me); err != nil {
-			return err
+	if ctx.ctxType == enumCtx {
+		ee := ctx.obj.(*EnumElement)
+		if isDigit(c) || c == '-' {
+			return p.readReservedRangesEnum(documentation, ee)
 		}
-	} else {
-		if err := p.readReservedNames(documentation, me); err != nil {
-			return err
-		}
+		return p.readReservedNamesEnum(documentation, ee)
 	}
-	return nil
+
+	me := ctx.obj.(*MessageElement)
+	if isDigit(c) {
+		return p.readReservedRanges(documentation, me)
+	}
+	return p.readReservedNames(documentation, me)
 }
 
 func (p *parser) readReservedRanges(documentation string, me *MessageElement) error {
@@ -351,6 +352,92 @@ func (p *parser) readReservedNames(documentation string, me *MessageElement) err
 		p.skipWhitespace()
 	}
 	return nil
+}
+
+func (p *parser) readReservedRangesEnum(documentation string, ee *EnumElement) error {
+	for {
+		p.skipWhitespace()
+		start, err := p.readSignedInt()
+		if err != nil {
+			return err
+		}
+
+		rr := ReservedRangeElement{Location: p.declLoc, Start: start, End: start, Documentation: documentation}
+
+		c := p.read()
+		if c == ';' {
+			ee.ReservedRanges = append(ee.ReservedRanges, rr)
+			break
+		} else if c == ',' {
+			ee.ReservedRanges = append(ee.ReservedRanges, rr)
+		} else {
+			p.unread()
+			p.skipWhitespace()
+			if w := p.readWord(); w != "to" {
+				return p.errline("Expected 'to', but found: %v", w)
+			}
+			p.skipWhitespace()
+			endStr := p.readWord()
+			var end int
+			if endStr == "max" {
+				end = 2147483647
+			} else {
+				end, err = strconv.Atoi(endStr)
+				if err != nil {
+					return p.errline("Expected integer or 'max', but found: %v", endStr)
+				}
+			}
+			rr.End = end
+			c2 := p.read()
+			if c2 == ';' {
+				ee.ReservedRanges = append(ee.ReservedRanges, rr)
+				break
+			} else if c2 == ',' {
+				ee.ReservedRanges = append(ee.ReservedRanges, rr)
+			} else {
+				return p.errline("Expected ',' or ';', but found: %v", strconv.QuoteRune(c2))
+			}
+		}
+	}
+	return nil
+}
+
+func (p *parser) readReservedNamesEnum(documentation string, ee *EnumElement) error {
+	for {
+		name, err := p.readQuotedString(nil)
+		if err != nil {
+			return err
+		}
+		ee.ReservedNames = append(ee.ReservedNames, name)
+
+		c := p.read()
+		if c == ';' {
+			break
+		}
+		if c != ',' {
+			return p.throw(',', c)
+		}
+		p.skipWhitespace()
+	}
+	return nil
+}
+
+func (p *parser) readSignedInt() (int, error) {
+	negative := false
+	c := p.read()
+	if c == '-' {
+		negative = true
+	} else {
+		p.unread()
+	}
+	val, err := p.readInt()
+	if err != nil {
+		return 0, err
+	}
+	if negative {
+		val = -val
+	}
+	return val, nil
 }
 
 func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {

@@ -34,12 +34,14 @@ type EnumConstantElement struct {
 // the enum construct in a protobuf file. Enums are
 // defined standalone or as nested entities within messages.
 type EnumElement struct {
-	Location      SourceLocation
-	Name          string
-	QualifiedName string
-	Documentation string
-	Options       []OptionElement
-	EnumConstants []EnumConstantElement
+	Location       SourceLocation
+	Name           string
+	QualifiedName  string
+	Documentation  string
+	Options        []OptionElement
+	EnumConstants  []EnumConstantElement
+	ReservedRanges []ReservedRangeElement
+	ReservedNames  []string
 }
 
 // RPCElement is a datastructure which models

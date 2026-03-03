@@ -1,0 +1,21 @@
+syntax = "proto3";
+package enumreserved;
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+  STATUS_INACTIVE = 5;
+  reserved 2, 3, 9 to 11, 40 to max;
+  reserved "STATUS_DELETED", "STATUS_ARCHIVED";
+}
+
+message Wrapper {
+  Status status = 1;
+
+  enum Priority {
+    PRIORITY_UNSPECIFIED = 0;
+    PRIORITY_HIGH = 1;
+    reserved 2 to 5;
+    reserved "PRIORITY_DEPRECATED";
+  }
+}

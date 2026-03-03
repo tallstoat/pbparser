@@ -84,7 +84,7 @@ func (pc parseCtx) permitsExtend() bool {
 
 // does this ctx permit reserved keyword support?
 func (pc parseCtx) permitsReserved() bool {
-	return pc.ctxType == msgCtx
+	return pc.ctxType == msgCtx || pc.ctxType == enumCtx
 }
 
 // does this ctx permit rpc support?

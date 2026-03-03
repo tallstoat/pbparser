@@ -877,3 +877,65 @@ func TestExtensionOnlyImport(t *testing.T) {
 		t.Errorf("Expected option name 'custom_ext.msg_opt', got %q", msg.Options[0].Name)
 	}
 }
+
+func TestEnumReserved(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/enum_reserved.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse enum_reserved.proto: %v", err)
+	}
+
+	// Top-level enum
+	if len(pf.Enums) != 1 {
+		t.Fatalf("Expected 1 enum, got %d", len(pf.Enums))
+	}
+	en := pf.Enums[0]
+	if en.Name != "Status" {
+		t.Errorf("Expected enum 'Status', got %q", en.Name)
+	}
+
+	// Reserved ranges: 2, 3, 9 to 11, 40 to max
+	if len(en.ReservedRanges) != 4 {
+		t.Fatalf("Expected 4 reserved ranges, got %d", len(en.ReservedRanges))
+	}
+	expectedRanges := [][2]int{{2, 2}, {3, 3}, {9, 11}, {40, 2147483647}}
+	for i, rr := range en.ReservedRanges {
+		if rr.Start != expectedRanges[i][0] || rr.End != expectedRanges[i][1] {
+			t.Errorf("Reserved range %d: expected %d to %d, got %d to %d",
+				i, expectedRanges[i][0], expectedRanges[i][1], rr.Start, rr.End)
+		}
+	}
+
+	// Reserved names: "STATUS_DELETED", "STATUS_ARCHIVED"
+	if len(en.ReservedNames) != 2 {
+		t.Fatalf("Expected 2 reserved names, got %d", len(en.ReservedNames))
+	}
+	if en.ReservedNames[0] != "STATUS_DELETED" {
+		t.Errorf("Expected reserved name 'STATUS_DELETED', got %q", en.ReservedNames[0])
+	}
+	if en.ReservedNames[1] != "STATUS_ARCHIVED" {
+		t.Errorf("Expected reserved name 'STATUS_ARCHIVED', got %q", en.ReservedNames[1])
+	}
+
+	// Nested enum in message
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+	msg := pf.Messages[0]
+	if len(msg.Enums) != 1 {
+		t.Fatalf("Expected 1 nested enum, got %d", len(msg.Enums))
+	}
+	nestedEnum := msg.Enums[0]
+	if len(nestedEnum.ReservedRanges) != 1 {
+		t.Fatalf("Expected 1 reserved range in nested enum, got %d", len(nestedEnum.ReservedRanges))
+	}
+	if nestedEnum.ReservedRanges[0].Start != 2 || nestedEnum.ReservedRanges[0].End != 5 {
+		t.Errorf("Expected reserved range 2 to 5, got %d to %d",
+			nestedEnum.ReservedRanges[0].Start, nestedEnum.ReservedRanges[0].End)
+	}
+	if len(nestedEnum.ReservedNames) != 1 {
+		t.Fatalf("Expected 1 reserved name in nested enum, got %d", len(nestedEnum.ReservedNames))
+	}
+	if nestedEnum.ReservedNames[0] != "PRIORITY_DEPRECATED" {
+		t.Errorf("Expected reserved name 'PRIORITY_DEPRECATED', got %q", nestedEnum.ReservedNames[0])
+	}
+}
