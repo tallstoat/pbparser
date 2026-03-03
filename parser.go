@@ -171,83 +171,67 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 
 	// Read next label...
 	label := p.readWord()
+
+	if !ctx.permits(label) {
+		return p.unexpected(label, ctx)
+	}
+
+	return p.dispatchDeclaration(pf, label, documentation, ctx)
+}
+
+// dispatchDeclaration routes a parsed keyword to the appropriate handler function.
+func (p *parser) dispatchDeclaration(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
 	switch label {
 	case "package":
-		if !ctx.permitsPackage() {
-			return p.unexpected(label, ctx)
-		}
 		p.skipWhitespace()
 		pf.PackageName = p.readWord()
 		p.prefix = pf.PackageName + "."
+		return nil
 	case "syntax":
-		if !ctx.permitsSyntax() {
-			return p.unexpected(label, ctx)
-		}
 		return p.readSyntax(pf)
 	case "edition":
-		if !ctx.permitsEdition() {
-			return p.unexpected(label, ctx)
-		}
 		return p.readEdition(pf)
 	case "import":
-		if !ctx.permitsImport() {
-			return p.unexpected(label, ctx)
-		}
 		return p.readImport(pf)
 	case "option":
-		if !ctx.permitsOption() {
-			return p.unexpected(label, ctx)
-		}
 		return p.readOption(pf, documentation, ctx)
 	case "message":
-		if !ctx.permitsMsg() {
-			return p.unexpected(label, ctx)
-		}
 		return p.readMessage(pf, documentation, ctx)
 	case "enum":
-		if !ctx.permitsEnum() {
-			return p.unexpected(label, ctx)
-		}
 		return p.readEnum(pf, documentation, ctx)
 	case "extend":
-		if !ctx.permitsExtend() {
-			return p.unexpected(label, ctx)
-		}
 		return p.readExtend(pf, documentation, ctx)
 	case "service":
 		return p.readService(pf, documentation)
 	case "rpc":
-		if !ctx.permitsRPC() {
-			return p.unexpected(label, ctx)
-		}
 		se := ctx.obj.(*ServiceElement)
 		return p.readRPC(pf, se, documentation)
 	case "oneof":
-		if !ctx.permitsOneOf() {
-			return p.unexpected(label, ctx)
-		}
 		return p.readOneOf(pf, documentation, ctx)
 	case "extensions":
-		if !ctx.permitsExtensions() {
-			return p.unexpected(label, ctx)
-		}
 		return p.readExtensions(pf, documentation, ctx)
 	case "reserved":
-		if !ctx.permitsReserved() {
-			return p.unexpected(label, ctx)
-		}
 		return p.readReserved(pf, documentation, ctx)
 	default:
-		if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx || ctx.ctxType == oneOfCtx {
-			if !ctx.permitsField() {
-				return p.errline("fields must be nested")
-			}
-			return p.readField(pf, label, documentation, ctx)
-		} else if ctx.ctxType == enumCtx {
-			return p.readEnumConstant(pf, label, documentation, ctx)
-		} else if label != "" {
-			return p.unexpected(label, ctx)
+		return p.readFieldOrEnumConstant(pf, label, documentation, ctx)
+	}
+}
+
+// readFieldOrEnumConstant handles the default case in readDeclaration where the
+// label is not a known keyword. It dispatches to field or enum constant parsing
+// based on the current context.
+func (p *parser) readFieldOrEnumConstant(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
+	if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx || ctx.ctxType == oneOfCtx {
+		if !ctx.permitsField() {
+			return p.errline("fields must be nested")
 		}
+		return p.readField(pf, label, documentation, ctx)
+	}
+	if ctx.ctxType == enumCtx {
+		return p.readEnumConstant(pf, label, documentation, ctx)
+	}
+	if label != "" {
+		return p.unexpected(label, ctx)
 	}
 	return nil
 }

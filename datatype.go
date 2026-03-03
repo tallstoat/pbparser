@@ -134,4 +134,3 @@ func (ndt NamedDataType) Category() DataTypeCategory {
 func (ndt NamedDataType) IsStream() bool {
 	return ndt.supportsStreaming
 }
-

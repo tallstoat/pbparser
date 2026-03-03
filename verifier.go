@@ -16,7 +16,6 @@ type protoFileOracle struct {
 // resolves and validates imports, ensures all referenced types are defined,
 // and enforces protobuf constraints such as unique names and enum rules.
 func verify(pf *ProtoFile, p ImportModuleProvider) error {
-	// validate syntax
 	if err := validateSyntaxOrEdition(pf); err != nil {
 		return err
 	}
@@ -25,45 +24,67 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		return errors.New("ImportModuleProvider is required to validate imports")
 	}
 
-	// make a map of package to its oracle...
+	m, err := buildOracle(pf, p)
+	if err != nil {
+		return err
+	}
+
+	packageNames := getDependencyPackageNames(pf.PackageName, m)
+
+	return runValidations(pf, m, packageNames)
+}
+
+// buildOracle parses all dependencies and builds the type oracle map,
+// including the main package's own types.
+func buildOracle(pf *ProtoFile, p ImportModuleProvider) (map[string]protoFileOracle, error) {
 	m := make(map[string]protoFileOracle)
 
-	// parse the dependencies...
 	if err := parseDependencies(p, pf.Dependencies, m); err != nil {
-		return err
+		return nil, err
 	}
-	// parse the public dependencies...
 	if err := parseDependencies(p, pf.PublicDependencies, m); err != nil {
-		return err
+		return nil, err
 	}
-	// parse the weak dependencies (best-effort; failures are ignored)...
 	parseWeakDependencies(p, pf.WeakDependencies, m)
 
-	// make oracle for main package and add to map...
 	orcl := protoFileOracle{pf: pf}
 	orcl.msgmap, orcl.enummap = makeQNameLookup(pf)
 	if existing, found := m[pf.PackageName]; found {
-		// update the main model as well in case it is defined across multiple files
 		merge(pf, existing.pf)
 	}
 	mergeOracle(m, pf.PackageName, orcl)
 
-	// collate the dependency package names...
-	packageNames := getDependencyPackageNames(pf.PackageName, m)
+	return m, nil
+}
 
-	// check if imported packages are in use
+// runValidations performs all post-parse validation checks on the ProtoFile.
+func runValidations(pf *ProtoFile, m map[string]protoFileOracle, packageNames []string) error {
 	if err := areImportedPackagesUsed(pf, packageNames); err != nil {
 		return err
 	}
 
-	// validate if the NamedDataType fields of messages (deep ones as well) are all defined in the model;
-	// either the main model or in dependencies
 	if err := validateFieldsRecursive(pf.PackageName, pf.Messages, pf.Messages, pf.Enums, m, packageNames); err != nil {
 		return err
 	}
 
-	// validate if each rpc request/response type is defined in the model;
-	// either the main model or in dependencies
+	if err := validateRPCDataTypes(pf, m, packageNames); err != nil {
+		return err
+	}
+
+	if err := validateUniqueMessageEnumNames("package "+pf.PackageName, pf.Enums, pf.Messages); err != nil {
+		return err
+	}
+
+	if err := validateAllEnums(pf); err != nil {
+		return err
+	}
+
+	return forEachMessageRecursive(pf.Messages, validateNoMapInOneOf)
+}
+
+// validateRPCDataTypes checks that all RPC request and response types across
+// all services are defined in the model or its dependencies.
+func validateRPCDataTypes(pf *ProtoFile, m map[string]protoFileOracle, packageNames []string) error {
 	for _, s := range pf.Services {
 		for _, rpc := range s.RPCs {
 			if err := validateRPCDataType(pf.PackageName, s.Name, rpc.Name, rpc.RequestType, m, packageNames); err != nil {
@@ -74,22 +95,6 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 			}
 		}
 	}
-
-	// validate that message and enum names are unique in the package as well as at the nested msg level (howsoever deep)
-	if err := validateUniqueMessageEnumNames("package "+pf.PackageName, pf.Enums, pf.Messages); err != nil {
-		return err
-	}
-
-	// validate all enum constraints: unique constants, tag aliases, and first-value-zero (proto3)
-	if err := validateAllEnums(pf); err != nil {
-		return err
-	}
-
-	// validate that map fields are not used inside oneofs
-	if err := forEachMessageRecursive(pf.Messages, validateNoMapInOneOf); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -452,6 +457,47 @@ func resolveTypeName(mainpkg string, typeName string, m map[string]protoFileOrac
 // validateFieldDataTypes checks that a single field's named type is resolvable.
 // It handles fully-qualified names, relative lookups within the enclosing message
 // scope chain, and top-level package lookups.
+// resolveUnqualifiedType attempts to resolve an unqualified type name (no dots)
+// by checking nested types, walking up the scope chain, and finally checking
+// package-level types.
+func resolveUnqualifiedType(mainpkg string, typeName string, msg *MessageElement, m map[string]protoFileOracle) bool {
+	// Check nested messages and enums in the same message
+	if matchMsgOrEnumName(typeName, msg.Messages, msg.Enums) {
+		return true
+	}
+	// Walk up the scope chain to check sibling types in enclosing messages
+	if msg.QualifiedName != "" {
+		orcl := m[mainpkg]
+		qn := msg.QualifiedName
+		for {
+			dotIdx := strings.LastIndexByte(qn, '.')
+			if dotIdx < 0 {
+				break
+			}
+			parent := qn[:dotIdx]
+			if parent == mainpkg {
+				break
+			}
+			candidate := parent + "." + typeName
+			if _, ok := orcl.msgmap[candidate]; ok {
+				return true
+			}
+			if _, ok := orcl.enummap[candidate]; ok {
+				return true
+			}
+			qn = parent
+		}
+	}
+	// Check first class messages & enums in the package
+	orcl := m[mainpkg]
+	candidate := mainpkg + "." + typeName
+	if _, ok := orcl.msgmap[candidate]; ok {
+		return true
+	}
+	_, ok := orcl.enummap[candidate]
+	return ok
+}
+
 func validateFieldDataTypes(mainpkg string, f fieldTypeRef, msgs []MessageElement, enums []EnumElement, m map[string]protoFileOracle, packageNames []string) error {
 	// Strip leading dot from fully-qualified type names (e.g. ".pkg.Type" -> "pkg.Type")
 	if strings.HasPrefix(f.typeName, ".") {
@@ -476,38 +522,7 @@ func validateFieldDataTypes(mainpkg string, f fieldTypeRef, msgs []MessageElemen
 			}
 		}
 	} else {
-		// Check any nested messages and nested enums in the same message which has the field
-		found = matchMsgOrEnumName(f.typeName, f.msg.Messages, f.msg.Enums)
-		// Walk up the scope chain to check sibling types in enclosing messages
-		if !found && f.msg.QualifiedName != "" {
-			orcl := m[mainpkg]
-			qn := f.msg.QualifiedName
-			for !found {
-				dotIdx := strings.LastIndexByte(qn, '.')
-				if dotIdx < 0 {
-					break
-				}
-				parent := qn[:dotIdx]
-				if parent == mainpkg {
-					break
-				}
-				candidate := parent + "." + f.typeName
-				_, found = orcl.msgmap[candidate]
-				if !found {
-					_, found = orcl.enummap[candidate]
-				}
-				qn = parent
-			}
-		}
-		// If not a nested message or enum, then just check first class messages & enums in the package
-		if !found {
-			orcl := m[mainpkg]
-			candidate := mainpkg + "." + f.typeName
-			_, found = orcl.msgmap[candidate]
-			if !found {
-				_, found = orcl.enummap[candidate]
-			}
-		}
+		found = resolveUnqualifiedType(mainpkg, f.typeName, f.msg, m)
 	}
 	if !found {
 		return fmt.Errorf("Datatype: '%v' referenced in field: '%v' is not defined", f.typeName, f.name)

@@ -317,8 +317,8 @@ func TestOptionalInProto3(t *testing.T) {
 		{"nickname", "optional"},
 		{"age", "optional"},
 		{"tags", "repeated"},
-		{"details", "optional"},  // optional message-type field
-		{"status", "optional"},   // optional enum-type field
+		{"details", "optional"}, // optional message-type field
+		{"status", "optional"},  // optional enum-type field
 	}
 	for i, f := range msg.Fields {
 		if f.Name != expected[i].name {
@@ -1068,9 +1068,9 @@ func TestHexOctalFieldTags(t *testing.T) {
 		tag  int
 	}{
 		{"decimal_field", 10},
-		{"hex_field", 20},       // 0x14 = 20
-		{"octal_field", 30},     // 036 = 30
-		{"hex_upper", 30},       // 0X1E = 30
+		{"hex_field", 20},   // 0x14 = 20
+		{"octal_field", 30}, // 036 = 30
+		{"hex_upper", 30},   // 0X1E = 30
 	}
 	for i, f := range msg.Fields {
 		if f.Name != expected[i].name {

@@ -200,80 +200,129 @@ func (p *parser) readSignedInt() (int, error) {
 	return val, nil
 }
 
-// readField parses a message field declaration including its label, type, name, tag,
-// and any inline options. It validates constraints such as disallowing required fields
-// in proto3, map key type restrictions, and correct context usage.
-func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
+// validateFieldLabel validates the field label and sets it on the FieldElement.
+// It returns the resolved data type string (which may differ from the label).
+func (p *parser) validateFieldLabel(pf *ProtoFile, label string, fe *FieldElement, ctx parseCtx) (string, error) {
 	if label == required && (pf.Syntax == proto3 || pf.Edition != "") {
-		return p.errline("Required fields are not allowed in proto3")
-	} else if label == required && ctx.ctxType == extendCtx {
-		return p.errline("Message extensions cannot have required fields")
+		return "", p.errline("Required fields are not allowed in proto3")
+	}
+	if label == required && ctx.ctxType == extendCtx {
+		return "", p.errline("Message extensions cannot have required fields")
 	}
 
-	// the field struct...
-	fe := FieldElement{Location: p.declLoc, Documentation: documentation}
-
-	// figure out dataTypeStr based on the label...
-	var err error
 	dataTypeStr := label
 	if label == required || label == optional || label == repeated {
 		if ctx.ctxType == oneOfCtx {
-			return p.errline("Label '%v' is disallowed in oneof field", label)
+			return "", p.errline("Label '%v' is disallowed in oneof field", label)
 		}
 		fe.Label = label
 		p.skipWhitespace()
 		dataTypeStr = p.readWord()
 	}
+	return dataTypeStr, nil
+}
 
-	// check for group construct (proto2 only)...
-	if dataTypeStr == "group" {
-		if pf.Syntax == proto3 || pf.Edition != "" {
-			return p.errline("Groups are not allowed in proto3 or editions")
+// validateMapField validates constraints specific to map fields: no labels,
+// not allowed in oneofs or extensions, and restricted key types.
+func (p *parser) validateMapField(fe *FieldElement, ctx parseCtx) error {
+	if fe.Label == repeated || fe.Label == required || fe.Label == optional {
+		return p.errline("Label %v is not allowed on map fields", fe.Label)
+	}
+	if ctx.ctxType == oneOfCtx {
+		return p.errline("Map fields are not allowed in oneofs")
+	}
+	if ctx.ctxType == extendCtx {
+		return p.errline("Map fields are not allowed to be extensions")
+	}
+	mdt := fe.Type.(MapDataType)
+	if mdt.keyType.Name() == "float" || mdt.keyType.Name() == "double" || mdt.keyType.Name() == "bytes" {
+		return p.errline("Key in map fields cannot be float, double or bytes")
+	}
+	if mdt.keyType.Category() == NamedDataTypeCategory {
+		return p.errline("Key in map fields cannot be a named type")
+	}
+	return nil
+}
+
+// appendFieldToContext adds the parsed field to the appropriate parent element
+// based on the current parse context (message, extend, or oneof).
+func appendFieldToContext(fe FieldElement, ctx parseCtx) {
+	switch ctx.ctxType {
+	case msgCtx:
+		me := ctx.obj.(*MessageElement)
+		me.Fields = append(me.Fields, fe)
+	case extendCtx:
+		ee := ctx.obj.(*ExtendElement)
+		ee.Fields = append(ee.Fields, fe)
+	case oneOfCtx:
+		oe := ctx.obj.(*OneOfElement)
+		oe.Fields = append(oe.Fields, fe)
+	}
+}
+
+// checkGroupField checks if the data type is "group" and handles it.
+// Returns true if it was a group (handled), false otherwise.
+func (p *parser) checkGroupField(pf *ProtoFile, dataTypeStr string, fe *FieldElement, documentation string, ctx parseCtx) (bool, error) {
+	if dataTypeStr != "group" {
+		return false, nil
+	}
+	if pf.Syntax == proto3 || pf.Edition != "" {
+		return true, p.errline("Groups are not allowed in proto3 or editions")
+	}
+	if fe.Label == "" {
+		return true, p.errline("Groups require a label (optional, required, or repeated)")
+	}
+	return true, p.readGroup(pf, fe.Label, documentation, ctx)
+}
+
+// validateProto3Defaults rejects 'default' options on fields in proto3.
+func (p *parser) validateProto3Defaults(pf *ProtoFile, options []OptionElement) error {
+	if pf.Syntax != proto3 {
+		return nil
+	}
+	for _, opt := range options {
+		if opt.Name == "default" {
+			return p.errline("Default values are not allowed in proto3")
 		}
-		if fe.Label == "" {
-			return p.errline("Groups require a label (optional, required, or repeated)")
-		}
-		return p.readGroup(pf, fe.Label, documentation, ctx)
+	}
+	return nil
+}
+
+// readField parses a message field declaration including its label, type, name, tag,
+// and any inline options. It validates constraints such as disallowing required fields
+// in proto3, map key type restrictions, and correct context usage.
+func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
+	fe := FieldElement{Location: p.declLoc, Documentation: documentation}
+
+	dataTypeStr, err := p.validateFieldLabel(pf, label, &fe, ctx)
+	if err != nil {
+		return err
 	}
 
-	// figure out the dataType
+	if isGroup, err := p.checkGroupField(pf, dataTypeStr, &fe, documentation, ctx); isGroup || err != nil {
+		return err
+	}
+
 	if fe.Type, err = p.readDataTypeInternal(dataTypeStr); err != nil {
 		return err
 	}
 
-	// perform checks for map data type...
 	if fe.Type.Category() == MapDataTypeCategory {
-		if fe.Label == repeated || fe.Label == required || fe.Label == optional {
-			return p.errline("Label %v is not allowed on map fields", fe.Label)
-		}
-		if ctx.ctxType == oneOfCtx {
-			return p.errline("Map fields are not allowed in oneofs")
-		}
-		if ctx.ctxType == extendCtx {
-			return p.errline("Map fields are not allowed to be extensions")
-		}
-		mdt := fe.Type.(MapDataType)
-		if mdt.keyType.Name() == "float" || mdt.keyType.Name() == "double" || mdt.keyType.Name() == "bytes" {
-			return p.errline("Key in map fields cannot be float, double or bytes")
-		}
-		if mdt.keyType.Category() == NamedDataTypeCategory {
-			return p.errline("Key in map fields cannot be a named type")
+		if err = p.validateMapField(&fe, ctx); err != nil {
+			return err
 		}
 	}
 
-	// figure out the name
 	p.skipWhitespace()
 	if fe.Name, _, err = p.readName(); err != nil {
 		return err
 	}
 
-	// check for equals sign...
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
 		return p.throw('=', c)
 	}
 
-	// extract the field tag...
 	p.skipWhitespace()
 	if fe.Tag, err = p.readIntLiteral(); err != nil {
 		return err
@@ -282,31 +331,15 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		return err
 	}
 
-	// If semicolon is next; we are done. If '[' is next, we must parse options for the field
 	if fe.Options, fe.InlineComment, err = p.readListOptionsOnALine(); err != nil {
 		return err
 	}
 
-	// reject 'default' option in proto3
-	if pf.Syntax == proto3 {
-		for _, opt := range fe.Options {
-			if opt.Name == "default" {
-				return p.errline("Default values are not allowed in proto3")
-			}
-		}
+	if err = p.validateProto3Defaults(pf, fe.Options); err != nil {
+		return err
 	}
 
-	// add field to the proper parent	...
-	if ctx.ctxType == msgCtx {
-		me := ctx.obj.(*MessageElement)
-		me.Fields = append(me.Fields, fe)
-	} else if ctx.ctxType == extendCtx {
-		ee := ctx.obj.(*ExtendElement)
-		ee.Fields = append(ee.Fields, fe)
-	} else if ctx.ctxType == oneOfCtx {
-		oe := ctx.obj.(*OneOfElement)
-		oe.Fields = append(oe.Fields, fe)
-	}
+	appendFieldToContext(fe, ctx)
 	return nil
 }
 
@@ -602,6 +635,57 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) 
 	return nil
 }
 
+// readExtensionRange parses a single extension range entry, handling both single
+// values and "start to end" ranges. It returns the parsed range and whether the
+// caller should break out of the range loop (';' or '[' encountered).
+func (p *parser) readExtensionRange(documentation string) (ExtensionsElement, bool, error) {
+	p.skipWhitespace()
+	start, err := p.readIntLiteral()
+	if err != nil {
+		return ExtensionsElement{}, false, err
+	}
+
+	xe := ExtensionsElement{Location: p.declLoc, Documentation: documentation, Start: start, End: start}
+
+	p.skipWhitespace()
+	c := p.read()
+	if c == ';' || c == '[' {
+		p.unread()
+		return xe, true, nil
+	}
+	if c == ',' {
+		return xe, false, nil
+	}
+
+	// must be "to <end>"
+	p.unread()
+	p.skipWhitespace()
+	if w := p.readWord(); w != "to" {
+		return xe, false, p.errline("Expected 'to', but found: %v", w)
+	}
+	p.skipWhitespace()
+	endStr := p.readWord()
+	if endStr == "max" {
+		xe.End = 536870911
+	} else {
+		xe.End, err = strconv.Atoi(endStr)
+		if err != nil {
+			return xe, false, err
+		}
+	}
+
+	p.skipWhitespace()
+	c2 := p.read()
+	if c2 == ';' || c2 == '[' {
+		p.unread()
+		return xe, true, nil
+	}
+	if c2 == ',' {
+		return xe, false, nil
+	}
+	return xe, false, p.errline("Expected ',' or ';', but found: %v", strconv.QuoteRune(c2))
+}
+
 // readExtensions parses an 'extensions' declaration that defines extension field number
 // ranges for a message (e.g. "extensions 100 to 199, 500 to max;"). It also handles
 // optional compact options on the ranges. Not allowed in proto3.
@@ -614,52 +698,13 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 
 	var ranges []ExtensionsElement
 	for {
-		p.skipWhitespace()
-		start, err := p.readIntLiteral()
+		xe, done, err := p.readExtensionRange(documentation)
 		if err != nil {
 			return err
 		}
-
-		xe := ExtensionsElement{Location: p.declLoc, Documentation: documentation, Start: start, End: start}
-
-		p.skipWhitespace()
-		c := p.read()
-		if c == ';' || c == '[' {
-			ranges = append(ranges, xe)
-			p.unread()
+		ranges = append(ranges, xe)
+		if done {
 			break
-		} else if c == ',' {
-			ranges = append(ranges, xe)
-		} else {
-			p.unread()
-			p.skipWhitespace()
-			if w := p.readWord(); w != "to" {
-				return p.errline("Expected 'to', but found: %v", w)
-			}
-			p.skipWhitespace()
-			var end int
-			endStr := p.readWord()
-			if endStr == "max" {
-				end = 536870911
-			} else {
-				end, err = strconv.Atoi(endStr)
-				if err != nil {
-					return err
-				}
-			}
-			xe.End = end
-
-			p.skipWhitespace()
-			c2 := p.read()
-			if c2 == ';' || c2 == '[' {
-				ranges = append(ranges, xe)
-				p.unread()
-				break
-			} else if c2 == ',' {
-				ranges = append(ranges, xe)
-			} else {
-				return p.errline("Expected ',' or ';', but found: %v", strconv.QuoteRune(c2))
-			}
 		}
 	}
 
@@ -819,38 +864,46 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 
 	c := p.read()
 	if c == '{' {
-		ctx := parseCtx{ctxType: rpcCtx, obj: &rpc}
-		for {
-			c2 := p.read()
-			if c2 == '}' {
-				break
-			}
-			p.unread()
-			if p.eofReached {
-				break
-			}
-
-			withinRPCBracketsDocumentation, err := p.readDocumentationIfFound()
-			if err != nil {
-				return err
-			}
-			p.skipWhitespace()
-
-			//parse for options...
-			if err = p.readDeclaration(pf, withinRPCBracketsDocumentation, ctx); err != nil {
-				return err
-			}
-		}
-		// consume optional trailing semicolon after '}'
-		p.skipWhitespace()
-		if c2 := p.read(); c2 != ';' {
-			p.unread()
+		if err = p.readRPCBody(pf, &rpc); err != nil {
+			return err
 		}
 	} else if c != ';' {
 		return p.throw(';', c)
 	}
 
 	se.RPCs = append(se.RPCs, rpc)
+	return nil
+}
+
+// readRPCBody parses the body of an RPC declaration (options between braces),
+// consuming the closing '}' and any optional trailing semicolon.
+func (p *parser) readRPCBody(pf *ProtoFile, rpc *RPCElement) error {
+	ctx := parseCtx{ctxType: rpcCtx, obj: rpc}
+	for {
+		c := p.read()
+		if c == '}' {
+			break
+		}
+		p.unread()
+		if p.eofReached {
+			break
+		}
+
+		doc, err := p.readDocumentationIfFound()
+		if err != nil {
+			return err
+		}
+		p.skipWhitespace()
+
+		if err = p.readDeclaration(pf, doc, ctx); err != nil {
+			return err
+		}
+	}
+	// consume optional trailing semicolon after '}'
+	p.skipWhitespace()
+	if c := p.read(); c != ';' {
+		p.unread()
+	}
 	return nil
 }
 
