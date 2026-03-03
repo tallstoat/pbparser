@@ -50,7 +50,7 @@ func TestParseErrors(t *testing.T) {
 	}{
 		{file: "missing-bracket-enum.proto", expectedErrors: []string{"Reached end of input in enum", "missing '}'"}},
 		{file: "missing-bracket-msg.proto", expectedErrors: []string{"Reached end of input in message", "missing '}'"}},
-		{file: "no-syntax.proto", expectedErrors: []string{"No syntax specified"}},
+		{file: "no-syntax.proto", expectedErrors: []string{"No syntax or edition specified"}},
 		{file: "wrong-syntax.proto", expectedErrors: []string{"'syntax' must be 'proto2' or 'proto3'"}},
 		{file: "wrong-syntax2.proto", expectedErrors: []string{"Expected ';'"}},
 		{file: "wrong-syntax3.proto", expectedErrors: []string{"Expected '='"}},
@@ -94,6 +94,8 @@ func TestParseErrors(t *testing.T) {
 		{file: "oneof-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'oneof' in context: service"}},
 		{file: "unused-import.proto", expectedErrors: []string{"Imported package: dummy but not used"}},
 		{file: "unclosed-aggregate.proto", expectedErrors: []string{"Unterminated aggregate value"}},
+		{file: "wrong-edition.proto", expectedErrors: []string{"Unsupported edition"}},
+		{file: "syntax-and-edition.proto", expectedErrors: []string{"Cannot specify both 'syntax' and 'edition'"}},
 	}
 
 	for _, tt := range tests {
@@ -534,4 +536,81 @@ func TestSourceLocations(t *testing.T) {
 	}
 	assertLoc("Nested MiddleAA", outer.Messages[0].Location, 121)
 	assertLoc("Nested MiddleBB", outer.Messages[1].Location, 127)
+}
+
+// TestEdition2023 verifies that edition = "2023" proto files are parsed correctly.
+func TestEdition2023(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/edition2023.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse edition2023.proto: %v", err)
+	}
+
+	// Edition should be set, Syntax should be empty
+	if pf.Edition != "2023" {
+		t.Errorf("Expected Edition '2023', got %q", pf.Edition)
+	}
+	if pf.Syntax != "" {
+		t.Errorf("Expected empty Syntax, got %q", pf.Syntax)
+	}
+
+	// Package
+	if pf.PackageName != "editiontest" {
+		t.Errorf("Expected package 'editiontest', got %q", pf.PackageName)
+	}
+
+	// Enums
+	if len(pf.Enums) != 1 {
+		t.Fatalf("Expected 1 enum, got %d", len(pf.Enums))
+	}
+	if pf.Enums[0].Name != "Status" {
+		t.Errorf("Expected enum 'Status', got %q", pf.Enums[0].Name)
+	}
+
+	// Messages
+	if len(pf.Messages) != 2 {
+		t.Fatalf("Expected 2 messages, got %d", len(pf.Messages))
+	}
+
+	req := pf.Messages[0]
+	if req.Name != "Request" {
+		t.Errorf("Expected message 'Request', got %q", req.Name)
+	}
+	if len(req.Fields) != 4 {
+		t.Fatalf("Expected 4 fields in Request, got %d", len(req.Fields))
+	}
+	// optional field
+	if req.Fields[1].Label != "optional" {
+		t.Errorf("Expected 'optional' label for priority field, got %q", req.Fields[1].Label)
+	}
+	// repeated field
+	if req.Fields[2].Label != "repeated" {
+		t.Errorf("Expected 'repeated' label for tags field, got %q", req.Fields[2].Label)
+	}
+
+	// Extensions (allowed in editions, unlike proto3)
+	if len(req.Extensions) != 1 {
+		t.Fatalf("Expected 1 extensions range in Request, got %d", len(req.Extensions))
+	}
+	if req.Extensions[0].Start != 100 || req.Extensions[0].End != 200 {
+		t.Errorf("Expected extensions 100 to 200, got %d to %d", req.Extensions[0].Start, req.Extensions[0].End)
+	}
+
+	// Extend declarations (allowed in editions)
+	if len(pf.ExtendDeclarations) != 1 {
+		t.Fatalf("Expected 1 extend declaration, got %d", len(pf.ExtendDeclarations))
+	}
+	if pf.ExtendDeclarations[0].Name != "Request" {
+		t.Errorf("Expected extend 'Request', got %q", pf.ExtendDeclarations[0].Name)
+	}
+
+	// Services
+	if len(pf.Services) != 1 {
+		t.Fatalf("Expected 1 service, got %d", len(pf.Services))
+	}
+	if pf.Services[0].Name != "MyService" {
+		t.Errorf("Expected service 'MyService', got %q", pf.Services[0].Name)
+	}
+	if len(pf.Services[0].RPCs) != 2 {
+		t.Fatalf("Expected 2 RPCs, got %d", len(pf.Services[0].RPCs))
+	}
 }

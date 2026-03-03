@@ -47,6 +47,11 @@ func (pc parseCtx) permitsSyntax() bool {
 	return pc.ctxType == fileCtx
 }
 
+// does this ctx permit edition support?
+func (pc parseCtx) permitsEdition() bool {
+	return pc.ctxType == fileCtx
+}
+
 // does this ctx permit import support?
 func (pc parseCtx) permitsImport() bool {
 	return pc.ctxType == fileCtx

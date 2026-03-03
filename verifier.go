@@ -14,7 +14,7 @@ type protoFileOracle struct {
 
 func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	// validate syntax
-	if err := validateSyntax(pf); err != nil {
+	if err := validateSyntaxOrEdition(pf); err != nil {
 		return err
 	}
 
@@ -272,9 +272,9 @@ func validateEnumConstantsInMessage(msg MessageElement) error {
 	return nil
 }
 
-func validateSyntax(pf *ProtoFile) error {
-	if pf.Syntax == "" {
-		return errors.New("No syntax specified in the proto file")
+func validateSyntaxOrEdition(pf *ProtoFile) error {
+	if pf.Syntax == "" && pf.Edition == "" {
+		return errors.New("No syntax or edition specified in the proto file")
 	}
 	return nil
 }
@@ -452,7 +452,7 @@ func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[s
 		}
 
 		// validate syntax
-		if err := validateSyntax(&dpf); err != nil {
+		if err := validateSyntaxOrEdition(&dpf); err != nil {
 			return err
 		}
 

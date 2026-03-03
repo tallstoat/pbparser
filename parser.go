@@ -179,6 +179,11 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 			return p.unexpected(label, ctx)
 		}
 		return p.readSyntax(pf)
+	} else if label == "edition" {
+		if !ctx.permitsEdition() {
+			return p.unexpected(label, ctx)
+		}
+		return p.readEdition(pf)
 	} else if label == "import" {
 		if !ctx.permitsImport() {
 			return p.unexpected(label, ctx)
@@ -349,7 +354,7 @@ func (p *parser) readReservedNames(documentation string, me *MessageElement) err
 }
 
 func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
-	if label == required && pf.Syntax == proto3 {
+	if label == required && (pf.Syntax == proto3 || pf.Edition != "") {
 		return p.errline("Required fields are not allowed in proto3")
 	} else if label == required && ctx.ctxType == extendCtx {
 		return p.errline("Message extensions cannot have required fields")
@@ -934,6 +939,29 @@ func (p *parser) readSyntax(pf *ProtoFile) error {
 		return p.throw(';', c)
 	}
 	pf.Syntax = syntax
+	return nil
+}
+
+func (p *parser) readEdition(pf *ProtoFile) error {
+	if pf.Syntax != "" {
+		return p.errline("Cannot specify both 'syntax' and 'edition'")
+	}
+	p.skipWhitespace()
+	if c := p.read(); c != '=' {
+		return p.throw('=', c)
+	}
+	p.skipWhitespace()
+	edition, err := p.readQuotedString(nil)
+	if err != nil {
+		return err
+	}
+	if edition != "2023" {
+		return p.errline("Unsupported edition: '%v'. Only '2023' is supported", edition)
+	}
+	if c := p.read(); c != ';' {
+		return p.throw(';', c)
+	}
+	pf.Edition = edition
 	return nil
 }
 

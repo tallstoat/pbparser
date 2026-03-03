@@ -153,6 +153,7 @@ type ExtendElement struct {
 type ProtoFile struct {
 	PackageName        string
 	Syntax             string
+	Edition            string
 	Dependencies       []string
 	PublicDependencies []string
 	Options            []OptionElement

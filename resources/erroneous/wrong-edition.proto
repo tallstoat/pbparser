@@ -1,0 +1,7 @@
+edition = "2022";
+
+package wrongedition;
+
+message Foo {
+  string bar = 1;
+}
