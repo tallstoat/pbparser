@@ -1021,6 +1021,11 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 				return err
 			}
 		}
+		// consume optional trailing semicolon after '}'
+		p.skipWhitespace()
+		if c2 := p.read(); c2 != ';' {
+			p.unread()
+		}
 	} else if c != ';' {
 		return p.throw(';', c)
 	}

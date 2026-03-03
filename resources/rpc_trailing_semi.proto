@@ -1,0 +1,20 @@
+syntax = "proto3";
+package rpcsemipkg;
+
+message Req {
+  int32 id = 1;
+}
+
+message Resp {
+  string result = 1;
+}
+
+service MyService {
+  rpc NoBody(Req) returns (Resp);
+  rpc WithBody(Req) returns (Resp) {
+    option deprecated = true;
+  };
+  rpc WithBodyNoSemi(Req) returns (Resp) {
+    option deprecated = true;
+  }
+}

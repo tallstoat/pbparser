@@ -1309,3 +1309,33 @@ func TestStringConcatenation(t *testing.T) {
 		t.Errorf("Expected reserved name 'field_c', got %q", msg.ReservedNames[1])
 	}
 }
+
+func TestRPCTrailingSemicolon(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/rpc_trailing_semi.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse rpc_trailing_semi.proto: %v", err)
+	}
+
+	if len(pf.Services) != 1 {
+		t.Fatalf("Expected 1 service, got %d", len(pf.Services))
+	}
+	svc := pf.Services[0]
+	if len(svc.RPCs) != 3 {
+		t.Fatalf("Expected 3 RPCs, got %d", len(svc.RPCs))
+	}
+
+	expectedNames := []string{"NoBody", "WithBody", "WithBodyNoSemi"}
+	for i, rpc := range svc.RPCs {
+		if rpc.Name != expectedNames[i] {
+			t.Errorf("RPC %d: expected name %q, got %q", i, expectedNames[i], rpc.Name)
+		}
+	}
+
+	// WithBody should have the deprecated option
+	if len(svc.RPCs[1].Options) != 1 {
+		t.Fatalf("Expected 1 option on WithBody, got %d", len(svc.RPCs[1].Options))
+	}
+	if svc.RPCs[1].Options[0].Name != "deprecated" {
+		t.Errorf("Expected option 'deprecated', got %q", svc.RPCs[1].Options[0].Name)
+	}
+}
