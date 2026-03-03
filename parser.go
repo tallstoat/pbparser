@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // Parse function parses the protobuf content passed to it by the the client code via
@@ -53,11 +53,11 @@ func ParseFile(file string) (ProtoFile, error) {
 	}
 
 	// read the proto file contents & create a reader...
-	raw, err := ioutil.ReadFile(file)
+	raw, err := os.ReadFile(file)
 	if err != nil {
 		return ProtoFile{}, err
 	}
-	r := strings.NewReader(string(raw[:]))
+	r := bytes.NewReader(raw)
 
 	// create default import module provider...
 	dir := filepath.Dir(file)
@@ -94,6 +94,7 @@ type parser struct {
 	prefix         string // The current package name + nested type names, separated by dots
 	lastColumnRead int
 	declLoc        SourceLocation // location captured at start of current declaration
+	wordBuf        []byte         // reusable scratch buffer for readWord
 }
 
 func (p *parser) currentLoc() SourceLocation {
@@ -167,80 +168,83 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 
 	// Read next label...
 	label := p.readWord()
-	if label == "package" {
+	switch label {
+	case "package":
 		if !ctx.permitsPackage() {
 			return p.unexpected(label, ctx)
 		}
 		p.skipWhitespace()
 		pf.PackageName = p.readWord()
 		p.prefix = pf.PackageName + "."
-	} else if label == "syntax" {
+	case "syntax":
 		if !ctx.permitsSyntax() {
 			return p.unexpected(label, ctx)
 		}
 		return p.readSyntax(pf)
-	} else if label == "edition" {
+	case "edition":
 		if !ctx.permitsEdition() {
 			return p.unexpected(label, ctx)
 		}
 		return p.readEdition(pf)
-	} else if label == "import" {
+	case "import":
 		if !ctx.permitsImport() {
 			return p.unexpected(label, ctx)
 		}
 		return p.readImport(pf)
-	} else if label == "option" {
+	case "option":
 		if !ctx.permitsOption() {
 			return p.unexpected(label, ctx)
 		}
 		return p.readOption(pf, documentation, ctx)
-	} else if label == "message" {
+	case "message":
 		if !ctx.permitsMsg() {
 			return p.unexpected(label, ctx)
 		}
 		return p.readMessage(pf, documentation, ctx)
-	} else if label == "enum" {
+	case "enum":
 		if !ctx.permitsEnum() {
 			return p.unexpected(label, ctx)
 		}
 		return p.readEnum(pf, documentation, ctx)
-	} else if label == "extend" {
+	case "extend":
 		if !ctx.permitsExtend() {
 			return p.unexpected(label, ctx)
 		}
 		return p.readExtend(pf, documentation, ctx)
-	} else if label == "service" {
+	case "service":
 		return p.readService(pf, documentation)
-	} else if label == "rpc" {
+	case "rpc":
 		if !ctx.permitsRPC() {
 			return p.unexpected(label, ctx)
 		}
 		se := ctx.obj.(*ServiceElement)
 		return p.readRPC(pf, se, documentation)
-	} else if label == "oneof" {
+	case "oneof":
 		if !ctx.permitsOneOf() {
 			return p.unexpected(label, ctx)
 		}
 		return p.readOneOf(pf, documentation, ctx)
-	} else if label == "extensions" {
+	case "extensions":
 		if !ctx.permitsExtensions() {
 			return p.unexpected(label, ctx)
 		}
 		return p.readExtensions(pf, documentation, ctx)
-	} else if label == "reserved" {
+	case "reserved":
 		if !ctx.permitsReserved() {
 			return p.unexpected(label, ctx)
 		}
 		return p.readReserved(pf, documentation, ctx)
-	} else if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx || ctx.ctxType == oneOfCtx {
-		if !ctx.permitsField() {
-			return p.errline("fields must be nested")
+	default:
+		if ctx.ctxType == msgCtx || ctx.ctxType == extendCtx || ctx.ctxType == oneOfCtx {
+			if !ctx.permitsField() {
+				return p.errline("fields must be nested")
+			}
+			return p.readField(pf, label, documentation, ctx)
+		} else if ctx.ctxType == enumCtx {
+			return p.readEnumConstant(pf, label, documentation, ctx)
+		} else if label != "" {
+			return p.unexpected(label, ctx)
 		}
-		return p.readField(pf, label, documentation, ctx)
-	} else if ctx.ctxType == enumCtx {
-		return p.readEnumConstant(pf, label, documentation, ctx)
-	} else if label != "" {
-		return p.unexpected(label, ctx)
 	}
 	return nil
 }
@@ -1250,10 +1254,8 @@ func (p *parser) readRequestResponseType() (NamedDataType, error) {
 	dt, err := p.readDataTypeInternal(name)
 	switch t := dt.(type) {
 	case NamedDataType:
-		_ = t
-		ndt := dt.(NamedDataType)
-		ndt.stream(requiresStreaming)
-		return ndt, err
+		t.supportsStreaming = requiresStreaming
+		return t, err
 	default:
 		return NamedDataType{}, errors.New("Expected message type")
 	}
@@ -1363,17 +1365,19 @@ func (p *parser) readWord() string {
 }
 
 func (p *parser) readWordAdvanced(f func(r rune) bool) string {
-	var buf bytes.Buffer
+	p.wordBuf = p.wordBuf[:0]
+	var tmp [utf8.UTFMax]byte
 	for {
 		c := p.read()
 		if isValidCharInWord(c, f) {
-			_, _ = buf.WriteRune(c)
+			n := utf8.EncodeRune(tmp[:], c)
+			p.wordBuf = append(p.wordBuf, tmp[:n]...)
 		} else {
 			p.unread()
 			break
 		}
 	}
-	return buf.String()
+	return string(p.wordBuf)
 }
 
 func (p *parser) readIntLiteral() (int, error) {
@@ -1455,14 +1459,14 @@ func (p *parser) readSingleLineComment() string {
 	str := strings.TrimSpace(p.readUntilNewline())
 	for {
 		p.skipWhitespace()
-		if c := p.read(); c != '/' {
-			p.unread()
+		// Peek ahead to check for "//" without consuming characters
+		peeked, err := p.br.Peek(2)
+		if err != nil || peeked[0] != '/' || peeked[1] != '/' {
 			break
 		}
-		if c := p.read(); c != '/' {
-			p.unread()
-			break
-		}
+		// Consume the two slashes
+		p.read()
+		p.read()
 		str += " " + strings.TrimSpace(p.readUntilNewline())
 	}
 	return str
@@ -1631,16 +1635,9 @@ func (p *parser) skipWhitespace() {
 
 func stripParenthesis(s string) (string, bool) {
 	if s[0] == '(' && s[len(s)-1] == ')' {
-		return parenthesisRemovalRegex.ReplaceAllString(s, "${1}"), true
+		return s[1 : len(s)-1], true
 	}
 	return s, false
-}
-
-func stripQuotes(s string) string {
-	if s[0] == '"' && s[len(s)-1] == '"' {
-		return quoteRemovalRegex.ReplaceAllString(s, "${1}")
-	}
-	return s
 }
 
 func isValidCharInWord(c rune, f func(r rune) bool) bool {
@@ -1675,11 +1672,6 @@ func isHexDigit(c rune) bool {
 // End of the file...
 var eof = rune(0)
 
-// Regex for removing bounding quotes
-var quoteRemovalRegex = regexp.MustCompile(`"([^"]*)"`)
-
-// Regex for removing bounding parenthesis
-var parenthesisRemovalRegex = regexp.MustCompile(`\(([^"]*)\)`)
 
 // enclousure used to bound/enclose a string
 type enclosure int

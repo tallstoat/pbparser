@@ -1,10 +1,10 @@
 package pbparser
 
 import (
+	"bytes"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
-	"strings"
 )
 
 // ImportModuleProvider is the interface which given a protobuf import module returns a reader for it.
@@ -29,14 +29,14 @@ type defaultImportModuleProviderImpl struct {
 }
 
 func (pi *defaultImportModuleProviderImpl) Provide(module string) (io.Reader, error) {
-	modulePath := pi.dir + string(filepath.Separator) + module
+	modulePath := filepath.Join(pi.dir, module)
 
 	// read the module file contents & create a reader...
-	raw, err := ioutil.ReadFile(modulePath)
+	raw, err := os.ReadFile(modulePath)
 	if err != nil {
 		return nil, err
 	}
 
-	r := strings.NewReader(string(raw[:]))
+	r := bytes.NewReader(raw)
 	return r, nil
 }

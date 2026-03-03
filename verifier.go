@@ -39,19 +39,11 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	// make oracle for main package and add to map...
 	orcl := protoFileOracle{pf: pf}
 	orcl.msgmap, orcl.enummap = makeQNameLookup(pf)
-	if _, found := m[pf.PackageName]; found {
-		for k, v := range orcl.msgmap {
-			m[pf.PackageName].msgmap[k] = v
-		}
-		for k, v := range orcl.enummap {
-			m[pf.PackageName].enummap[k] = v
-		}
-
+	if existing, found := m[pf.PackageName]; found {
 		// update the main model as well in case it is defined across multiple files
-		merge(pf, m[pf.PackageName].pf)
-	} else {
-		m[pf.PackageName] = orcl
+		merge(pf, existing.pf)
 	}
+	mergeOracle(m, pf.PackageName, orcl)
 
 	// collate the dependency package names...
 	packageNames := getDependencyPackageNames(pf.PackageName, m)
@@ -94,10 +86,10 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		return err
 	}
 	// validate if enum constants are unique across nested enums within nested messages (howsoever deep)
-	for _, msg := range pf.Messages {
-		if err := validateEnumConstantsInMessage(msg); err != nil {
-			return err
-		}
+	if err := forEachMessageRecursive(pf.Messages, func(msg MessageElement) error {
+		return validateEnumConstants("message "+msg.Name, msg.Enums)
+	}); err != nil {
+		return err
 	}
 
 	// allow aliases in enums only if option allow_alias is specified
@@ -105,10 +97,10 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		return err
 	}
 	// allow aliases in nested enums within nested messages (howsoever deep) only if option allow_alias is specified
-	for _, msg := range pf.Messages {
-		if err := validateEnumConstantTagAliasesInMessage(msg); err != nil {
-			return err
-		}
+	if err := forEachMessageRecursive(pf.Messages, func(msg MessageElement) error {
+		return validateEnumConstantTagAliases(msg.Enums)
+	}); err != nil {
+		return err
 	}
 
 	// in proto3, the first enum value must be zero
@@ -116,76 +108,67 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		if err := validateEnumFirstValueZero(pf.Enums); err != nil {
 			return err
 		}
-		for _, msg := range pf.Messages {
-			if err := validateEnumFirstValueZeroInMessage(msg); err != nil {
-				return err
-			}
+		if err := forEachMessageRecursive(pf.Messages, func(msg MessageElement) error {
+			return validateEnumFirstValueZero(msg.Enums)
+		}); err != nil {
+			return err
 		}
 	}
 
 	// validate that map fields are not used inside oneofs
-	for _, msg := range pf.Messages {
-		if err := validateNoMapInOneOf(msg); err != nil {
-			return err
-		}
+	if err := forEachMessageRecursive(pf.Messages, validateNoMapInOneOf); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func merge(dest *ProtoFile, src *ProtoFile) {
-	for _, d := range src.Dependencies {
-		dest.Dependencies = append(dest.Dependencies, d)
-	}
-	for _, d := range src.PublicDependencies {
-		dest.PublicDependencies = append(dest.PublicDependencies, d)
-	}
-	for _, d := range src.WeakDependencies {
-		dest.WeakDependencies = append(dest.WeakDependencies, d)
-	}
-	for _, d := range src.Options {
-		dest.Options = append(dest.Options, d)
-	}
-	for _, d := range src.Messages {
-		dest.Messages = append(dest.Messages, d)
-	}
-	for _, d := range src.Enums {
-		dest.Enums = append(dest.Enums, d)
-	}
-	for _, d := range src.ExtendDeclarations {
-		dest.ExtendDeclarations = append(dest.ExtendDeclarations, d)
+func mergeOracle(m map[string]protoFileOracle, packageName string, orcl protoFileOracle) {
+	if existing, found := m[packageName]; found {
+		for k, v := range orcl.msgmap {
+			existing.msgmap[k] = v
+		}
+		for k, v := range orcl.enummap {
+			existing.enummap[k] = v
+		}
+	} else {
+		m[packageName] = orcl
 	}
 }
 
+func merge(dest *ProtoFile, src *ProtoFile) {
+	dest.Dependencies = append(dest.Dependencies, src.Dependencies...)
+	dest.PublicDependencies = append(dest.PublicDependencies, src.PublicDependencies...)
+	dest.WeakDependencies = append(dest.WeakDependencies, src.WeakDependencies...)
+	dest.Options = append(dest.Options, src.Options...)
+	dest.Messages = append(dest.Messages, src.Messages...)
+	dest.Enums = append(dest.Enums, src.Enums...)
+	dest.ExtendDeclarations = append(dest.ExtendDeclarations, src.ExtendDeclarations...)
+}
+
 func areImportedPackagesUsed(pf *ProtoFile, packageNames []string) error {
+OUTER:
 	for _, pkg := range packageNames {
-		var inuse bool
 		// check if any request/response types are referring to this imported package...
 		for _, service := range pf.Services {
 			for _, rpc := range service.RPCs {
 				if usesPackage(rpc.RequestType.Name(), pkg, packageNames) {
-					inuse = true
-					goto LABEL
+					continue OUTER
 				}
 				if usesPackage(rpc.ResponseType.Name(), pkg, packageNames) {
-					inuse = true
-					goto LABEL
+					continue OUTER
 				}
 			}
 		}
 		// check if any fields in messages (nested or not) are referring to this imported package...
 		if checkImportedPackageUsage(pf.Messages, pkg, packageNames) {
-			inuse = true
-			goto LABEL
+			continue OUTER
 		}
 		// check if any options (at any level) reference this imported package via parenthesized names...
 		if checkOptionPackageUsage(pf, pkg, packageNames) {
-			inuse = true
+			continue OUTER
 		}
-	LABEL:
-		if !inuse {
-			return errors.New("Imported package: " + pkg + " but not used")
-		}
+		return errors.New("Imported package: " + pkg + " but not used")
 	}
 	return nil
 }
@@ -340,12 +323,12 @@ func validateEnumConstantTagAliases(enums []EnumElement) error {
 	return nil
 }
 
-func validateEnumConstantTagAliasesInMessage(msg MessageElement) error {
-	if err := validateEnumConstantTagAliases(msg.Enums); err != nil {
-		return err
-	}
-	for _, nestedmsg := range msg.Messages {
-		if err := validateEnumConstantTagAliasesInMessage(nestedmsg); err != nil {
+func forEachMessageRecursive(msgs []MessageElement, fn func(MessageElement) error) error {
+	for _, msg := range msgs {
+		if err := fn(msg); err != nil {
+			return err
+		}
+		if err := forEachMessageRecursive(msg.Messages, fn); err != nil {
 			return err
 		}
 	}
@@ -374,17 +357,6 @@ func validateEnumConstants(ctxName string, enums []EnumElement) error {
 	return nil
 }
 
-func validateEnumConstantsInMessage(msg MessageElement) error {
-	if err := validateEnumConstants("message "+msg.Name, msg.Enums); err != nil {
-		return err
-	}
-	for _, nestedmsg := range msg.Messages {
-		if err := validateEnumConstantsInMessage(nestedmsg); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 func validateSyntaxOrEdition(pf *ProtoFile) error {
 	if pf.Syntax == "" && pf.Edition == "" {
@@ -430,18 +402,18 @@ func gatherNestedQNames(parentmsg MessageElement, msgmap map[string]bool, enumma
 type fd struct {
 	name     string
 	category string
-	msg      MessageElement
+	msg      *MessageElement
 }
 
 func findFieldsToValidate(msgs []MessageElement, fields *[]fd) {
-	for _, msg := range msgs {
-		for _, f := range msg.Fields {
+	for i := range msgs {
+		for _, f := range msgs[i].Fields {
 			if f.Type.Category() == NamedDataTypeCategory {
-				*fields = append(*fields, fd{name: f.Name, category: f.Type.Name(), msg: msg})
+				*fields = append(*fields, fd{name: f.Name, category: f.Type.Name(), msg: &msgs[i]})
 			}
 		}
-		if len(msg.Messages) > 0 {
-			findFieldsToValidate(msg.Messages, fields)
+		if len(msgs[i].Messages) > 0 {
+			findFieldsToValidate(msgs[i].Messages, fields)
 		}
 	}
 }
@@ -591,41 +563,34 @@ func checkEnumName(s string, enums []EnumElement) bool {
 	return false
 }
 
+func parseDependency(impr ImportModuleProvider, d string, m map[string]protoFileOracle) error {
+	r, err := impr.Provide(d)
+	if err != nil {
+		return fmt.Errorf("ImportModuleReader is unable to provide content of dependency module %v. Reason:: %v", d, err.Error())
+	}
+	if r == nil {
+		return fmt.Errorf("ImportModuleReader is unable to provide reader for dependency module %v", d)
+	}
+
+	dpf := ProtoFile{}
+	if err := parse(r, &dpf); err != nil {
+		return fmt.Errorf("Unable to parse dependency %v. Reason:: %v", d, err.Error())
+	}
+
+	if err := validateSyntaxOrEdition(&dpf); err != nil {
+		return err
+	}
+
+	orcl := protoFileOracle{pf: &dpf}
+	orcl.msgmap, orcl.enummap = makeQNameLookup(&dpf)
+	mergeOracle(m, dpf.PackageName, orcl)
+	return nil
+}
+
 func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[string]protoFileOracle) error {
 	for _, d := range dependencies {
-		r, err := impr.Provide(d)
-		if err != nil {
-			msg := fmt.Sprintf("ImportModuleReader is unable to provide content of dependency module %v. Reason:: %v", d, err.Error())
-			return errors.New(msg)
-		}
-		if r == nil {
-			msg := fmt.Sprintf("ImportModuleReader is unable to provide reader for dependency module %v", d)
-			return errors.New(msg)
-		}
-
-		dpf := ProtoFile{}
-		if err := parse(r, &dpf); err != nil {
-			msg := fmt.Sprintf("Unable to parse dependency %v. Reason:: %v", d, err.Error())
-			return errors.New(msg)
-		}
-
-		// validate syntax
-		if err := validateSyntaxOrEdition(&dpf); err != nil {
+		if err := parseDependency(impr, d, m); err != nil {
 			return err
-		}
-
-		orcl := protoFileOracle{pf: &dpf}
-		orcl.msgmap, orcl.enummap = makeQNameLookup(&dpf)
-
-		if _, found := m[dpf.PackageName]; found {
-			for k, v := range orcl.msgmap {
-				m[dpf.PackageName].msgmap[k] = v
-			}
-			for k, v := range orcl.enummap {
-				m[dpf.PackageName].enummap[k] = v
-			}
-		} else {
-			m[dpf.PackageName] = orcl
 		}
 	}
 	return nil
@@ -633,34 +598,8 @@ func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[s
 
 func parseWeakDependencies(impr ImportModuleProvider, dependencies []string, m map[string]protoFileOracle) {
 	for _, d := range dependencies {
-		r, err := impr.Provide(d)
-		if err != nil || r == nil {
-			// weak imports are optional; skip if unavailable
-			continue
-		}
-
-		dpf := ProtoFile{}
-		if err := parse(r, &dpf); err != nil {
-			continue
-		}
-
-		if err := validateSyntaxOrEdition(&dpf); err != nil {
-			continue
-		}
-
-		orcl := protoFileOracle{pf: &dpf}
-		orcl.msgmap, orcl.enummap = makeQNameLookup(&dpf)
-
-		if _, found := m[dpf.PackageName]; found {
-			for k, v := range orcl.msgmap {
-				m[dpf.PackageName].msgmap[k] = v
-			}
-			for k, v := range orcl.enummap {
-				m[dpf.PackageName].enummap[k] = v
-			}
-		} else {
-			m[dpf.PackageName] = orcl
-		}
+		// weak imports are optional; skip if unavailable or unparseable
+		_ = parseDependency(impr, d, m)
 	}
 }
 
@@ -673,17 +612,6 @@ func validateEnumFirstValueZero(enums []EnumElement) error {
 	return nil
 }
 
-func validateEnumFirstValueZeroInMessage(msg MessageElement) error {
-	if err := validateEnumFirstValueZero(msg.Enums); err != nil {
-		return err
-	}
-	for _, nestedmsg := range msg.Messages {
-		if err := validateEnumFirstValueZeroInMessage(nestedmsg); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 func validateNoMapInOneOf(msg MessageElement) error {
 	for _, oo := range msg.OneOfs {
@@ -691,11 +619,6 @@ func validateNoMapInOneOf(msg MessageElement) error {
 			if f.Type.Category() == MapDataTypeCategory {
 				return fmt.Errorf("Map fields are not allowed in oneofs (field '%v' in oneof '%v' of message '%v')", f.Name, oo.Name, msg.QualifiedName)
 			}
-		}
-	}
-	for _, nestedmsg := range msg.Messages {
-		if err := validateNoMapInOneOf(nestedmsg); err != nil {
-			return err
 		}
 	}
 	return nil
