@@ -939,3 +939,36 @@ func TestEnumReserved(t *testing.T) {
 		t.Errorf("Expected reserved name 'PRIORITY_DEPRECATED', got %q", nestedEnum.ReservedNames[0])
 	}
 }
+
+func TestNegativeEnumValues(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/negative_enum.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse negative_enum.proto: %v", err)
+	}
+
+	if len(pf.Enums) != 1 {
+		t.Fatalf("Expected 1 enum, got %d", len(pf.Enums))
+	}
+	en := pf.Enums[0]
+	if len(en.EnumConstants) != 4 {
+		t.Fatalf("Expected 4 enum constants, got %d", len(en.EnumConstants))
+	}
+
+	expected := []struct {
+		name string
+		tag  int
+	}{
+		{"ZERO", 0},
+		{"NEGATIVE_ONE", -1},
+		{"NEGATIVE_TWO", -2},
+		{"POSITIVE", 3},
+	}
+	for i, ec := range en.EnumConstants {
+		if ec.Name != expected[i].name {
+			t.Errorf("Constant %d: expected name %q, got %q", i, expected[i].name, ec.Name)
+		}
+		if ec.Tag != expected[i].tag {
+			t.Errorf("Constant %d: expected tag %d, got %d", i, expected[i].tag, ec.Tag)
+		}
+	}
+}

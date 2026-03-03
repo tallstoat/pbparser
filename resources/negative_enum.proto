@@ -1,0 +1,9 @@
+syntax = "proto3";
+package negenumpkg;
+
+enum SignedEnum {
+  ZERO = 0;
+  NEGATIVE_ONE = -1;
+  NEGATIVE_TWO = -2;
+  POSITIVE = 3;
+}

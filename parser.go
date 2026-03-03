@@ -835,7 +835,7 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 	var err error
 	ec := EnumConstantElement{Location: p.declLoc, Name: label, Documentation: documentation}
 
-	if ec.Tag, err = p.readInt(); err != nil {
+	if ec.Tag, err = p.readSignedInt(); err != nil {
 		return p.errline("Unable to read tag for Enum Constant: %v due to: %v", label, err.Error())
 	}
 
