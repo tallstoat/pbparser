@@ -1,0 +1,20 @@
+syntax = "proto3";
+package optionalpkg;
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+}
+
+message Inner {
+  int32 value = 1;
+}
+
+message Outer {
+  string name = 1;
+  optional string nickname = 2;
+  optional int32 age = 3;
+  repeated string tags = 4;
+  optional Inner details = 5;
+  optional Status status = 6;
+}

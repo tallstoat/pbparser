@@ -290,30 +290,41 @@ var (
 )
 
 // TestOptionalInProto3 verifies that the 'optional' label is allowed in proto3
-// (explicit field presence, supported since protobuf v3.15).
+// (explicit field presence, supported since protobuf v3.15) for scalar, message,
+// and enum field types.
 func TestOptionalInProto3(t *testing.T) {
-	pf, err := pbparser.ParseFile(errResourceDir + "optional-in-proto3.proto")
+	pf, err := pbparser.ParseFile("./resources/optional_proto3.proto")
 	if err != nil {
 		t.Fatalf("Expected optional in proto3 to parse successfully, got error: %v", err)
 	}
 
-	if len(pf.Messages) != 1 {
-		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	if len(pf.Messages) != 2 {
+		t.Fatalf("Expected 2 messages, got %d", len(pf.Messages))
 	}
 
-	msg := pf.Messages[0]
-	if len(msg.Fields) != 2 {
-		t.Fatalf("Expected 2 fields, got %d", len(msg.Fields))
+	msg := pf.Messages[1] // Outer
+	if len(msg.Fields) != 6 {
+		t.Fatalf("Expected 6 fields, got %d", len(msg.Fields))
 	}
 
-	// First field has no label (default in proto3)
-	if msg.Fields[0].Label != "" {
-		t.Errorf("Expected empty label for field 'status', got %q", msg.Fields[0].Label)
+	expected := []struct {
+		name  string
+		label string
+	}{
+		{"name", ""},
+		{"nickname", "optional"},
+		{"age", "optional"},
+		{"tags", "repeated"},
+		{"details", "optional"},  // optional message-type field
+		{"status", "optional"},   // optional enum-type field
 	}
-
-	// Second field has explicit optional label
-	if msg.Fields[1].Label != "optional" {
-		t.Errorf("Expected 'optional' label for field 'for', got %q", msg.Fields[1].Label)
+	for i, f := range msg.Fields {
+		if f.Name != expected[i].name {
+			t.Errorf("Field %d: expected name %q, got %q", i, expected[i].name, f.Name)
+		}
+		if f.Label != expected[i].label {
+			t.Errorf("Field %q: expected label %q, got %q", expected[i].name, expected[i].label, f.Label)
+		}
 	}
 }
 
