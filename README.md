@@ -57,6 +57,10 @@ On the other hand, Clients should use the ParseFile() function if all the import
 
 Please refer to the [examples](https://godoc.org/github.com/tallstoat/pbparser#pkg-examples) for API usage.
 
+## Known Limitations
+
+**Option values are not type-checked.** Option values are stored as plain strings and accepted as-is without validation against their declared types. For example, `option java_multiple_files = true;` stores `"true"` as a string rather than validating it as a boolean. Full option type validation would require a registry of option definitions (including those from `google/protobuf/descriptor.proto`) and resolution of custom option extensions to their declared types — effectively a full compilation step. This is beyond the scope of a parser library; even `protoc` performs option type checking in a separate compilation phase, not during parsing.
+
 ## Issues
 
 If you run into any issues or have enhancement suggestions, please create an issue [here](https://github.com/tallstoat/pbparser/issues).
@@ -65,11 +69,11 @@ However I would much prefer PRs since at this time I'm unable to work on issues 
 
 ## Contributing
 
-1. Fork this repo.
-2. Create your feature branch (`git checkout -b my-new-feature`).
-3. Commit your changes (`git commit -am 'Add some feature'`).
-4. Push to the branch (`git push origin my-new-feature`).
-5. Create new Pull Request.
+We are not accepting contributions at this time due to lack of bandwidth to review and maintain external PRs.
+
+## Disclaimer
+
+This software is provided as-is, with no guarantees of correctness, completeness, or fitness for any particular purpose. Use at your own risk.
 
 ## License
 
