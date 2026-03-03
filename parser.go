@@ -702,8 +702,8 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 // or signed number with leading +/-).
 func (p *parser) readOptionValue(oe *OptionElement) error {
 	c := p.read()
-	if c == '"' {
-		oe.Value = p.readUntil('"')
+	if c == '"' || c == '\'' {
+		oe.Value = p.readUntil(c)
 	} else if c == '{' {
 		val, err := p.readAggregateValue()
 		if err != nil {
@@ -727,21 +727,21 @@ func (p *parser) readOptionValue(oe *OptionElement) error {
 func (p *parser) readAggregateValue() (string, error) {
 	var buf bytes.Buffer
 	depth := 1
-	inQuote := false
+	var quoteChar rune
 	for {
 		c := p.read()
 		if c == eof {
 			return "", p.errline("Unterminated aggregate value (missing '}')")
 		}
-		if inQuote {
+		if quoteChar != 0 {
 			_, _ = buf.WriteRune(c)
-			if c == '"' {
-				inQuote = false
+			if c == quoteChar {
+				quoteChar = 0
 			}
 			continue
 		}
-		if c == '"' {
-			inQuote = true
+		if c == '"' || c == '\'' {
+			quoteChar = c
 			_, _ = buf.WriteRune(c)
 		} else if c == '{' {
 			depth++
@@ -1139,12 +1139,13 @@ func (p *parser) readEdition(pf *ProtoFile) error {
 }
 
 func (p *parser) readQuotedString(f func(r rune) bool) (string, error) {
-	if c := p.read(); c != '"' {
-		return "", p.throw('"', c)
+	quote := p.read()
+	if quote != '"' && quote != '\'' {
+		return "", p.errcol("Expected '\"' or '\\'', but found: %v", strconv.QuoteRune(quote))
 	}
-	str := p.readWordAdvanced(f)
-	if c := p.read(); c != '"' {
-		return "", p.throw('"', c)
+	str := p.readUntil(quote)
+	if p.eofReached {
+		return "", p.errline("Unterminated string literal")
 	}
 	return str, nil
 }
@@ -1391,7 +1392,7 @@ func (p *parser) readUntil(delimiter rune) string {
 			p.eofReached = true
 			break
 		}
-		if c == '\\' && delimiter == '"' {
+		if c == '\\' && (delimiter == '"' || delimiter == '\'') {
 			_, _ = buf.WriteRune(c)
 			c2 := p.read()
 			if c2 == eof {

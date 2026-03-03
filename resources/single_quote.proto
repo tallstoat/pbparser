@@ -1,0 +1,16 @@
+syntax = 'proto3';
+package singlequotepkg;
+
+option java_package = 'com.example.singlequote';
+option (custom_opt) = 'hello world';
+
+message Foo {
+  string name = 1 [default = 'single quoted'];
+  int32 id = 2;
+}
+
+enum Status {
+  UNKNOWN = 0;
+  ACTIVE = 1;
+  reserved 'OLD_NAME';
+}

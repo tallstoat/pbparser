@@ -71,7 +71,7 @@ func TestParseErrors(t *testing.T) {
 		{file: "missing-package.proto", expectedErrors: []string{"Datatype: 'abcd.TaskDetails' referenced in field: 'details' is not defined"}},
 		{file: "wrong-import.proto", expectedErrors: []string{"ImportModuleReader is unable to provide content of dependency module"}},
 		{file: "wrong-import2.proto", expectedErrors: []string{"Expected 'public' or 'weak'"}},
-		{file: "wrong-import3.proto", expectedErrors: []string{"Expected '\"'"}},
+		{file: "wrong-import3.proto", expectedErrors: []string{"Unterminated string literal"}},
 		{file: "wrong-public-import.proto", expectedErrors: []string{"ImportModuleReader is unable to provide content of dependency module"}},
 		{file: "wrong-rpc-datatype.proto", expectedErrors: []string{"Datatype: 'TaskId' referenced in RPC: 'AddTask' of Service: 'LogTask' is not defined"}},
 		{file: "wrong-label-in-oneof-field.proto", expectedErrors: []string{"Label 'repeated' is disallowed in oneoff field"}},
@@ -1187,5 +1187,48 @@ func TestMultiExtensionRanges(t *testing.T) {
 	}
 	if bar.Extensions[1].Start != 20 || bar.Extensions[1].End != 30 {
 		t.Errorf("Bar extension 1: expected 20 to 30, got %d to %d", bar.Extensions[1].Start, bar.Extensions[1].End)
+	}
+}
+
+func TestSingleQuotedStrings(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/single_quote.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse single_quote.proto: %v", err)
+	}
+
+	// Syntax parsed from single-quoted string
+	if pf.Syntax != "proto3" {
+		t.Errorf("Expected syntax 'proto3', got %q", pf.Syntax)
+	}
+
+	// Package
+	if pf.PackageName != "singlequotepkg" {
+		t.Errorf("Expected package 'singlequotepkg', got %q", pf.PackageName)
+	}
+
+	// File-level options with single-quoted values
+	if len(pf.Options) != 2 {
+		t.Fatalf("Expected 2 file options, got %d", len(pf.Options))
+	}
+	if pf.Options[0].Name != "java_package" || pf.Options[0].Value != "com.example.singlequote" {
+		t.Errorf("Option 0: expected java_package='com.example.singlequote', got %q=%q", pf.Options[0].Name, pf.Options[0].Value)
+	}
+	if pf.Options[1].Name != "custom_opt" || pf.Options[1].Value != "hello world" {
+		t.Errorf("Option 1: expected custom_opt='hello world', got %q=%q", pf.Options[1].Name, pf.Options[1].Value)
+	}
+
+	// Field option with single-quoted value
+	msg := pf.Messages[0]
+	if len(msg.Fields[0].Options) != 1 {
+		t.Fatalf("Expected 1 field option, got %d", len(msg.Fields[0].Options))
+	}
+	if msg.Fields[0].Options[0].Value != "single quoted" {
+		t.Errorf("Expected field option value 'single quoted', got %q", msg.Fields[0].Options[0].Value)
+	}
+
+	// Enum reserved name with single-quoted string
+	enum := pf.Enums[0]
+	if len(enum.ReservedNames) != 1 || enum.ReservedNames[0] != "OLD_NAME" {
+		t.Errorf("Expected reserved name 'OLD_NAME', got %v", enum.ReservedNames)
 	}
 }
