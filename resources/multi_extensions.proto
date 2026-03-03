@@ -1,0 +1,13 @@
+syntax = "proto2";
+package multiextpkg;
+
+message Foo {
+  required int32 id = 1;
+  extensions 100 to 199, 500, 1000 to max;
+}
+
+message Bar {
+  required int32 id = 1;
+  extensions 10;
+  extensions 20 to 30;
+}

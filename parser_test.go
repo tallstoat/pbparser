@@ -1153,3 +1153,39 @@ func TestLeadingDotTypeNames(t *testing.T) {
 		t.Errorf("Expected response type '.leadingdotpkg.Inner', got %q", rpc.ResponseType.Name())
 	}
 }
+
+func TestMultiExtensionRanges(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/multi_extensions.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse multi_extensions.proto: %v", err)
+	}
+
+	if len(pf.Messages) != 2 {
+		t.Fatalf("Expected 2 messages, got %d", len(pf.Messages))
+	}
+
+	// Foo: extensions 100 to 199, 500, 1000 to max;
+	foo := pf.Messages[0]
+	if len(foo.Extensions) != 3 {
+		t.Fatalf("Expected 3 extension ranges in Foo, got %d", len(foo.Extensions))
+	}
+	expectedFoo := [][2]int{{100, 199}, {500, 500}, {1000, 536870911}}
+	for i, xe := range foo.Extensions {
+		if xe.Start != expectedFoo[i][0] || xe.End != expectedFoo[i][1] {
+			t.Errorf("Foo extension %d: expected %d to %d, got %d to %d",
+				i, expectedFoo[i][0], expectedFoo[i][1], xe.Start, xe.End)
+		}
+	}
+
+	// Bar: two separate extensions statements
+	bar := pf.Messages[1]
+	if len(bar.Extensions) != 2 {
+		t.Fatalf("Expected 2 extension ranges in Bar, got %d", len(bar.Extensions))
+	}
+	if bar.Extensions[0].Start != 10 || bar.Extensions[0].End != 10 {
+		t.Errorf("Bar extension 0: expected 10 to 10, got %d to %d", bar.Extensions[0].Start, bar.Extensions[0].End)
+	}
+	if bar.Extensions[1].Start != 20 || bar.Extensions[1].End != 30 {
+		t.Errorf("Bar extension 1: expected 20 to 30, got %d to %d", bar.Extensions[1].Start, bar.Extensions[1].End)
+	}
+}

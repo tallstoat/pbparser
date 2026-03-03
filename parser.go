@@ -804,38 +804,53 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 		return p.errline("Extension ranges are not allowed in proto3")
 	}
 
-	p.skipWhitespace()
-	start, err := p.readIntLiteral()
-	if err != nil {
-		return err
-	}
+	me := ctx.obj.(*MessageElement)
 
-	// At this point, make End be same as Start...
-	xe := ExtensionsElement{Location: p.declLoc, Documentation: documentation, Start: start, End: start}
-
-	c := p.read()
-	if c != ';' {
-		p.unread()
+	for {
 		p.skipWhitespace()
-		if w := p.readWord(); w != "to" {
-			return p.errline("Expected 'to', but found: %v", w)
+		start, err := p.readIntLiteral()
+		if err != nil {
+			return err
 		}
-		p.skipWhitespace()
-		var end int
-		endStr := p.readWord()
-		if endStr == "max" {
-			end = 536870911
+
+		xe := ExtensionsElement{Location: p.declLoc, Documentation: documentation, Start: start, End: start}
+
+		c := p.read()
+		if c == ';' {
+			me.Extensions = append(me.Extensions, xe)
+			break
+		} else if c == ',' {
+			me.Extensions = append(me.Extensions, xe)
 		} else {
-			end, err = strconv.Atoi(endStr)
-			if err != nil {
-				return err
+			p.unread()
+			p.skipWhitespace()
+			if w := p.readWord(); w != "to" {
+				return p.errline("Expected 'to', but found: %v", w)
+			}
+			p.skipWhitespace()
+			var end int
+			endStr := p.readWord()
+			if endStr == "max" {
+				end = 536870911
+			} else {
+				end, err = strconv.Atoi(endStr)
+				if err != nil {
+					return err
+				}
+			}
+			xe.End = end
+
+			c2 := p.read()
+			if c2 == ';' {
+				me.Extensions = append(me.Extensions, xe)
+				break
+			} else if c2 == ',' {
+				me.Extensions = append(me.Extensions, xe)
+			} else {
+				return p.errline("Expected ',' or ';', but found: %v", strconv.QuoteRune(c2))
 			}
 		}
-		xe.End = end
 	}
-
-	me := ctx.obj.(*MessageElement)
-	me.Extensions = append(me.Extensions, xe)
 	return nil
 }
 
