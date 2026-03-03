@@ -375,6 +375,17 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 		dataTypeStr = p.readWord()
 	}
 
+	// check for group construct (proto2 only)...
+	if dataTypeStr == "group" {
+		if pf.Syntax == proto3 || pf.Edition != "" {
+			return p.errline("Groups are not allowed in proto3 or editions")
+		}
+		if fe.Label == "" {
+			return p.errline("Groups require a label (optional, required, or repeated)")
+		}
+		return p.readGroup(pf, fe.Label, documentation, ctx)
+	}
+
 	// figure out the dataType
 	if fe.Type, err = p.readDataTypeInternal(dataTypeStr); err != nil {
 		return err
@@ -433,6 +444,47 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	} else if ctx.ctxType == oneOfCtx {
 		oe := ctx.obj.(*OneOfElement)
 		oe.Fields = append(oe.Fields, fe)
+	}
+	return nil
+}
+
+func (p *parser) readGroup(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
+	p.skipWhitespace()
+	name, _, err := p.readName()
+	if err != nil {
+		return err
+	}
+
+	ge := GroupElement{Location: p.declLoc, Name: name, Label: label, Documentation: documentation}
+
+	// read tag: = <number>
+	p.skipWhitespace()
+	if c := p.read(); c != '=' {
+		return p.throw('=', c)
+	}
+	p.skipWhitespace()
+	if ge.Tag, err = p.readInt(); err != nil {
+		return err
+	}
+
+	// read opening brace
+	p.skipWhitespace()
+	if c := p.read(); c != '{' {
+		return p.throw('{', c)
+	}
+
+	// read fields inside the group using a temporary message context
+	me := MessageElement{Name: name}
+	innerCtx := parseCtx{ctxType: msgCtx, obj: &me}
+	if err = p.readDeclarationsInLoop(pf, innerCtx); err != nil {
+		return err
+	}
+	ge.Fields = me.Fields
+
+	// add group to the parent message
+	if ctx.ctxType == msgCtx {
+		parent := ctx.obj.(*MessageElement)
+		parent.Groups = append(parent.Groups, ge)
 	}
 	return nil
 }

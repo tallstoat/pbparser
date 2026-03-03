@@ -1,0 +1,16 @@
+syntax = "proto2";
+package grouptest;
+
+message SearchResponse {
+  optional group Result = 1 {
+    optional string url = 1;
+    optional string title = 2;
+    repeated string snippets = 3;
+  }
+
+  repeated group AnotherResult = 2 {
+    required string url = 1;
+  }
+
+  optional string query = 3;
+}

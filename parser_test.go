@@ -96,6 +96,7 @@ func TestParseErrors(t *testing.T) {
 		{file: "unclosed-aggregate.proto", expectedErrors: []string{"Unterminated aggregate value"}},
 		{file: "wrong-edition.proto", expectedErrors: []string{"Unsupported edition"}},
 		{file: "syntax-and-edition.proto", expectedErrors: []string{"Cannot specify both 'syntax' and 'edition'"}},
+		{file: "group-in-proto3.proto", expectedErrors: []string{"Groups are not allowed in proto3 or editions"}},
 	}
 
 	for _, tt := range tests {
@@ -645,5 +646,68 @@ func TestWeakImport(t *testing.T) {
 	}
 	if pf.Messages[0].Name != "Foo" {
 		t.Errorf("Expected message 'Foo', got %q", pf.Messages[0].Name)
+	}
+}
+
+// TestGroup verifies that proto2 group constructs are parsed correctly.
+func TestGroup(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/group.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse group.proto: %v", err)
+	}
+
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+
+	msg := pf.Messages[0]
+	if msg.Name != "SearchResponse" {
+		t.Errorf("Expected message 'SearchResponse', got %q", msg.Name)
+	}
+
+	// Should have 2 groups
+	if len(msg.Groups) != 2 {
+		t.Fatalf("Expected 2 groups, got %d", len(msg.Groups))
+	}
+
+	// First group: optional Result
+	g1 := msg.Groups[0]
+	if g1.Name != "Result" {
+		t.Errorf("Expected group name 'Result', got %q", g1.Name)
+	}
+	if g1.Label != "optional" {
+		t.Errorf("Expected group label 'optional', got %q", g1.Label)
+	}
+	if g1.Tag != 1 {
+		t.Errorf("Expected group tag 1, got %d", g1.Tag)
+	}
+	if len(g1.Fields) != 3 {
+		t.Fatalf("Expected 3 fields in Result group, got %d", len(g1.Fields))
+	}
+	if g1.Fields[0].Name != "url" {
+		t.Errorf("Expected field 'url', got %q", g1.Fields[0].Name)
+	}
+	if g1.Fields[2].Label != "repeated" {
+		t.Errorf("Expected 'repeated' label for snippets, got %q", g1.Fields[2].Label)
+	}
+
+	// Second group: repeated AnotherResult
+	g2 := msg.Groups[1]
+	if g2.Name != "AnotherResult" {
+		t.Errorf("Expected group name 'AnotherResult', got %q", g2.Name)
+	}
+	if g2.Label != "repeated" {
+		t.Errorf("Expected group label 'repeated', got %q", g2.Label)
+	}
+	if g2.Tag != 2 {
+		t.Errorf("Expected group tag 2, got %d", g2.Tag)
+	}
+
+	// Regular field should still be present
+	if len(msg.Fields) != 1 {
+		t.Fatalf("Expected 1 regular field, got %d", len(msg.Fields))
+	}
+	if msg.Fields[0].Name != "query" {
+		t.Errorf("Expected field 'query', got %q", msg.Fields[0].Name)
 	}
 }

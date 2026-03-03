@@ -124,10 +124,24 @@ type MessageElement struct {
 	Enums              []EnumElement
 	Messages           []MessageElement
 	OneOfs             []OneOfElement
+	Groups             []GroupElement
 	ExtendDeclarations []ExtendElement
 	Extensions         []ExtensionsElement
 	ReservedRanges     []ReservedRangeElement
 	ReservedNames      []string
+}
+
+// GroupElement is a datastructure which models the deprecated
+// group construct in a proto2 file. A group simultaneously defines
+// a nested message type and a field of that type. Groups are only
+// valid in proto2.
+type GroupElement struct {
+	Location      SourceLocation
+	Name          string
+	Documentation string
+	Label         string /* optional, required, repeated */
+	Tag           int
+	Fields        []FieldElement
 }
 
 // ExtendElement is a datastructure which models
