@@ -1,16 +1,13 @@
 /*
-Package pbparser is a library for parsing protocol buffer (".proto") files.
+Package pbparser is a zero-dependency library for parsing protocol buffer (".proto") files.
 
-It exposes two APIs for parsing protocol buffer files. Both APIs return a
-ProtoFile datastructure and a non-nil Error if there is an issue.
-
-After the parsing operation, this library also validates any references to
-imported constructs i.e. any references to imported enums, messages etc in the
-file match the definitions in the imported modules.
+It supports proto2, proto3, and edition 2023 syntax, and returns a structured
+ProtoFile representation of the parsed content. After parsing, the library also
+validates type references, import usage, and proto-version-specific constraints.
 
 # API
 
-Clients should invoke the following APIs:
+Clients should invoke one of the following APIs:
 
 	func Parse(r io.Reader, p ImportModuleProvider) (ProtoFile, error)
 
@@ -39,12 +36,12 @@ comfortable with letting the pbparser library access the disk directly.
 
 # ProtoFile datastructure
 
-This datastructure represents the parsed model of the given protobuf file. It includes the following information:
+This datastructure represents the parsed model of the given protobuf file:
 
 	type ProtoFile struct {
 		PackageName        string               // name of the package
-		Syntax             string               // the protocol buffer syntax
-		Edition            string               // the protocol buffer edition (alternative to syntax)
+		Syntax             string               // "proto2" or "proto3"
+		Edition            string               // edition string (e.g. "2023"), alternative to Syntax
 		Dependencies       []string             // names of any imports
 		PublicDependencies []string             // names of any public imports
 		WeakDependencies   []string             // names of any weak imports
@@ -56,6 +53,47 @@ This datastructure represents the parsed model of the given protobuf file. It in
 	}
 
 Each attribute in turn has a defined structure, which is explained in the godoc of the corresponding elements.
+
+# Supported Constructs
+
+The parser handles the following protobuf constructs:
+
+Messages: nested messages and enums, oneof fields, map fields, groups (proto2),
+optional fields in proto3, reserved ranges and names, extensions with inline options,
+extend declarations (top-level and nested).
+
+Enums: constants with inline options, allow_alias, negative values, reserved ranges and names.
+
+Services: service-level options, RPC methods with all four gRPC streaming patterns
+(unary, server streaming, client streaming, bidirectional), RPC-level options including
+aggregate options (e.g. google.api.http annotations), multiple services per file.
+
+Options: file/message/enum/service/RPC/field-level options, parenthesized custom option
+names, aggregate option values with nested brace syntax. Aggregate options are identified
+via OptionElement.IsAggregateValue and the raw content is available in OptionElement.Value.
+
+Imports: standard, public, and weak imports.
+
+Types: all scalar types, fully-qualified names with package prefixes, leading-dot
+fully-qualified names, nested message type references.
+
+String literals: double-quoted and single-quoted, escape sequences including hex (\x)
+and unicode (\u, \U), adjacent string literal concatenation.
+
+Source locations: all parsed elements include a SourceLocation with line and column numbers.
+
+Inline comments: trailing comments on field and enum constant declarations are captured in
+FieldElement.InlineComment and EnumConstantElement.InlineComment.
+
+# Validation
+
+After parsing, the library validates:
+
+  - All type references resolve to defined messages or enums (local or imported)
+  - Import dependencies are present and used
+  - Field tag numbers are within valid protobuf ranges (1 to 536870911, excluding 19000-19999)
+  - Proto3 constraints (no required fields, no default values, no groups, no extension ranges)
+  - Duplicate name detection for messages, enums, and enum constants
 
 # Design Considerations
 

@@ -3,22 +3,22 @@
 
 # pbparser
 
-Pbparser is a library for parsing protocol buffer (".proto") files.
+Pbparser is a zero-dependency Go library for parsing protocol buffer (".proto") files. It supports proto2, proto3, and edition 2023 syntax.
 
 ## Why?
 
-Protocol buffers are a flexible and efficient mechanism for serializing structured data. 
-The Protbuf compiler (protoc) is *the source of truth* when it comes to parsing proto files.
+Protocol buffers are a flexible and efficient mechanism for serializing structured data.
+The Protobuf compiler (protoc) is *the source of truth* when it comes to parsing proto files.
 However protoc can be challenging to use in some scenarios :-
 
 * Protoc can be invoked by spawning a process from go code. If the caller now relies on the output of the compiler, they would have to parse the messages on stdout. This is fine for situations which need mere validations of proto files but does not work for usecases which require a standard defined parsed output structure to work with.
-* Protoc can also be invoked with *--descriptor_set_out* option to write out the proto file as a FileDescriptorSet (a protocol buffer defined in descriptor.proto). Ideally, this should have been sufficient. However, this again requires one to write a text parser to parse it. 
+* Protoc can also be invoked with *--descriptor_set_out* option to write out the proto file as a FileDescriptorSet (a protocol buffer defined in descriptor.proto). Ideally, this should have been sufficient. However, this again requires one to write a text parser to parse it.
 
 This parser library is meant to address the above mentioned challenges.
 
 ## Installing
 
-Using pbparser is easy. First, use `go get` to install the latest version of the library. 
+Using pbparser is easy. First, use `go get` to install the latest version of the library.
 
 ```
 go get -u github.com/tallstoat/pbparser
@@ -48,13 +48,106 @@ The ParseFile() function is a utility function which expects the client code to 
 
 ## Choosing an API
 
-Clients should use the Parse() function if they are not comfortable with letting the pbparser library access the disk directly. This function should also be preferred if the imports in the protobuf file are accessible to the client code but the client code does not want to give pbparser direct access to them. In such cases, the client code has to construct a ImportModuleProvider instance and pass it to the library. This instance must know how to resolve a given "import" and provide a reader for it.  
+Clients should use the Parse() function if they are not comfortable with letting the pbparser library access the disk directly. This function should also be preferred if the imports in the protobuf file are accessible to the client code but the client code does not want to give pbparser direct access to them. In such cases, the client code has to construct a ImportModuleProvider instance and pass it to the library. This instance must know how to resolve a given "import" and provide a reader for it.
 
-On the other hand, Clients should use the ParseFile() function if all the imported files as well as the protobuf file are on disk relative to the directory in which the protobuf file resides and they are comfortable with letting the pbparser library access the disk directly.  
+On the other hand, Clients should use the ParseFile() function if all the imported files as well as the protobuf file are on disk relative to the directory in which the protobuf file resides and they are comfortable with letting the pbparser library access the disk directly.
 
 ## Usage
 
 Please refer to the [examples](https://godoc.org/github.com/tallstoat/pbparser#pkg-examples) for API usage.
+
+## Supported Features
+
+### Syntax and Editions
+
+- **proto2 and proto3** syntax declarations
+- **Edition 2023** (`edition = "2023";`) as an alternative to syntax
+
+### Messages
+
+- Nested messages and enums within messages
+- `oneof` fields
+- `map<KeyType, ValueType>` fields with key type validation
+- `group` declarations (proto2)
+- `optional` fields in proto3
+- `reserved` ranges and names (including `max` keyword)
+- `extensions` ranges with optional inline options
+- `extend` declarations (top-level and nested within messages)
+- Field tag validation (range checks, reserved range enforcement)
+- Hex (`0x`) and octal (`0`) field tag number formats
+
+### Enums
+
+- Enum constant definitions with inline options
+- `allow_alias` support
+- Negative enum values
+- Reserved ranges and names (including negative ranges)
+
+### Services and RPCs
+
+- Service declarations with service-level options
+- RPC methods with all four gRPC streaming patterns:
+  - Unary (no streaming)
+  - Server streaming (`returns (stream ResponseType)`)
+  - Client streaming (`(stream RequestType) returns`)
+  - Bidirectional streaming (both request and response streaming)
+- RPC-level options, including aggregate options for gRPC HTTP annotations
+- Multiple services per file
+- Fully-qualified and nested message types as RPC parameters
+- Optional trailing semicolons after RPC body
+
+### Options
+
+- File-level, message-level, enum-level, service-level, and RPC-level options
+- Inline field options (`[deprecated=true]`)
+- Parenthesized custom option names (`(google.api.http)`)
+- **Aggregate option values** with nested brace syntax, e.g.:
+  ```protobuf
+  option (google.api.http) = {
+    get: "/v1/items/{name=items/*}"
+    body: "*"
+  };
+  ```
+- Aggregate options are identified via `OptionElement.IsAggregateValue` and the raw value is available in `OptionElement.Value`
+- Float and scientific notation in option values
+
+### Imports
+
+- Standard imports
+- `import public` declarations
+- `import weak` declarations (missing weak imports do not cause errors)
+
+### Types
+
+- All scalar types (int32, int64, float, double, bool, string, bytes, etc.)
+- Fully-qualified type names with package prefixes (`pkg.MessageType`)
+- Leading-dot fully-qualified names (`.pkg.MessageType`)
+- Nested message type references (`Outer.Middle.Inner`)
+
+### String Literals
+
+- Double-quoted and single-quoted strings
+- Escape sequences (`\n`, `\t`, `\\`, `\"`, etc.)
+- Hex (`\x`), unicode (`\u`, `\U`) escape sequences
+- Adjacent string literal concatenation
+
+### Source Locations
+
+All parsed elements include a `SourceLocation` with line and column numbers, enabling IDE integration and error reporting that maps back to the original `.proto` file.
+
+### Inline Comments
+
+Inline comments (trailing `//` comments on the same line as a declaration) are captured in `FieldElement.InlineComment` and `EnumConstantElement.InlineComment`.
+
+### Validation
+
+After parsing, the library validates:
+
+- All type references resolve to defined messages or enums (local or imported)
+- Import dependencies are present and used
+- Field tag numbers are within valid protobuf ranges
+- Proto3 constraints (no required fields, no default values, no groups, no extension ranges)
+- Duplicate name detection for messages, enums, and enum constants
 
 ## Known Limitations
 
@@ -63,8 +156,6 @@ Please refer to the [examples](https://godoc.org/github.com/tallstoat/pbparser#p
 ## Issues
 
 If you run into any issues or have enhancement suggestions, please create an issue [here](https://github.com/tallstoat/pbparser/issues).
-
-However I would much prefer PRs since at this time I'm unable to work on issues :-/
 
 ## Contributing
 
@@ -77,4 +168,3 @@ This software is provided as-is, with no guarantees of correctness, completeness
 ## License
 
 Pbparser is released under the MIT license. See [LICENSE](https://github.com/tallstoat/pbparser/blob/master/LICENSE)
-
