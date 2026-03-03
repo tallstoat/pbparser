@@ -521,6 +521,9 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	if fe.Tag, err = p.readInt(); err != nil {
 		return err
 	}
+	if err = p.validateFieldTag(fe.Tag); err != nil {
+		return err
+	}
 
 	// If semicolon is next; we are done. If '[' is next, we must parse options for the field
 	if fe.Options, fe.InlineComment, err = p.readListOptionsOnALine(); err != nil {
@@ -557,6 +560,9 @@ func (p *parser) readGroup(pf *ProtoFile, label string, documentation string, ct
 	}
 	p.skipWhitespace()
 	if ge.Tag, err = p.readInt(); err != nil {
+		return err
+	}
+	if err = p.validateFieldTag(ge.Tag); err != nil {
 		return err
 	}
 
@@ -1191,6 +1197,22 @@ func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 
 	// must be a named type
 	return NamedDataType{name: name}, nil
+}
+
+const (
+	maxFieldNumber          = 536870911 // 2^29 - 1
+	reservedRangeStart      = 19000
+	reservedRangeEnd        = 19999
+)
+
+func (p *parser) validateFieldTag(tag int) error {
+	if tag < 1 || tag > maxFieldNumber {
+		return p.errline("Field number %d is out of range. Must be between 1 and %d", tag, maxFieldNumber)
+	}
+	if tag >= reservedRangeStart && tag <= reservedRangeEnd {
+		return p.errline("Field number %d is in the reserved range %d to %d", tag, reservedRangeStart, reservedRangeEnd)
+	}
+	return nil
 }
 
 func (p *parser) unexpected(label string, ctx parseCtx) error {
