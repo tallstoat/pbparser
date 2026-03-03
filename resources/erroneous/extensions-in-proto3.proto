@@ -1,0 +1,7 @@
+syntax = "proto3";
+package extproto3;
+
+message Foo {
+  int32 id = 1;
+  extensions 100 to 199;
+}

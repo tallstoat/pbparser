@@ -101,6 +101,7 @@ func TestParseErrors(t *testing.T) {
 		{file: "wrong-edition.proto", expectedErrors: []string{"Unsupported edition"}},
 		{file: "syntax-and-edition.proto", expectedErrors: []string{"Cannot specify both 'syntax' and 'edition'"}},
 		{file: "group-in-proto3.proto", expectedErrors: []string{"Groups are not allowed in proto3 or editions"}},
+		{file: "extensions-in-proto3.proto", expectedErrors: []string{"Extension ranges are not allowed in proto3"}},
 	}
 
 	for _, tt := range tests {
