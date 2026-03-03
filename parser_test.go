@@ -972,3 +972,30 @@ func TestNegativeEnumValues(t *testing.T) {
 		}
 	}
 }
+
+func TestReservedMax(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/reserved_max.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse reserved_max.proto: %v", err)
+	}
+
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+	msg := pf.Messages[0]
+
+	// First reserved: 100 to max
+	// Second reserved: 10, 20 to 30, 1000 to max
+	// Total: 4 ranges
+	if len(msg.ReservedRanges) != 4 {
+		t.Fatalf("Expected 4 reserved ranges, got %d", len(msg.ReservedRanges))
+	}
+
+	expectedRanges := [][2]int{{100, 536870911}, {10, 10}, {20, 30}, {1000, 536870911}}
+	for i, rr := range msg.ReservedRanges {
+		if rr.Start != expectedRanges[i][0] || rr.End != expectedRanges[i][1] {
+			t.Errorf("Reserved range %d: expected %d to %d, got %d to %d",
+				i, expectedRanges[i][0], expectedRanges[i][1], rr.Start, rr.End)
+		}
+	}
+}

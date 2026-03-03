@@ -1,0 +1,9 @@
+syntax = "proto3";
+package reservedmaxpkg;
+
+message Foo {
+  int32 id = 1;
+  string name = 2;
+  reserved 100 to max;
+  reserved 10, 20 to 30, 1000 to max;
+}

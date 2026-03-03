@@ -311,9 +311,15 @@ func (p *parser) readReservedRanges(documentation string, me *MessageElement) er
 				return p.errline("Expected 'to', but found: %v", w)
 			}
 			p.skipWhitespace()
-			end, err := p.readInt()
-			if err != nil {
-				return err
+			endStr := p.readWord()
+			var end int
+			if endStr == "max" {
+				end = 536870911
+			} else {
+				end, err = strconv.Atoi(endStr)
+				if err != nil {
+					return p.errline("Expected integer or 'max', but found: %v", endStr)
+				}
 			}
 			rr.End = end
 			c2 := p.read()
