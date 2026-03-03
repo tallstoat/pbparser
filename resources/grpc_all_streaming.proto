@@ -1,0 +1,38 @@
+syntax = "proto3";
+package streaming;
+
+message Ping {
+  string msg = 1;
+}
+
+message Pong {
+  string reply = 1;
+}
+
+service StreamingService {
+  // Unary: no streaming
+  rpc UnaryCall (Ping) returns (Pong);
+
+  // Server streaming
+  rpc ServerStream (Ping) returns (stream Pong);
+
+  // Client streaming
+  rpc ClientStream (stream Ping) returns (Pong);
+
+  // Bidirectional streaming
+  rpc BidiStream (stream Ping) returns (stream Pong);
+
+  // Streaming with options
+  rpc ServerStreamWithOpts (Ping) returns (stream Pong) {
+    option deprecated = true;
+    option (custom_opt) = "value";
+  }
+
+  // Bidi streaming with aggregate option
+  rpc BidiStreamWithAnnotation (stream Ping) returns (stream Pong) {
+    option (google.api.http) = {
+      post: "/v1/bidi"
+      body: "*"
+    };
+  }
+}

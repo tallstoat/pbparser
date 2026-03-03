@@ -1404,3 +1404,300 @@ func TestExtensionRangeOptions(t *testing.T) {
 		t.Errorf("Expected 0 options on Baz extension, got %d", len(baz.Extensions[0].Options))
 	}
 }
+
+// TestGRPCMultipleServices verifies that multiple service definitions in a single
+// proto file are parsed correctly, each with their own RPCs and options.
+func TestGRPCMultipleServices(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/grpc_multiple_services.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse grpc_multiple_services.proto: %v", err)
+	}
+
+	if len(pf.Services) != 2 {
+		t.Fatalf("Expected 2 services, got %d", len(pf.Services))
+	}
+
+	// First service: UserService
+	userSvc := pf.Services[0]
+	if userSvc.Name != "UserService" {
+		t.Errorf("Expected service name 'UserService', got %q", userSvc.Name)
+	}
+	if len(userSvc.Options) != 1 || userSvc.Options[0].Name != "deprecated" {
+		t.Errorf("Expected 1 option 'deprecated' on UserService, got %d options", len(userSvc.Options))
+	}
+	if len(userSvc.RPCs) != 2 {
+		t.Fatalf("Expected 2 RPCs in UserService, got %d", len(userSvc.RPCs))
+	}
+	if userSvc.RPCs[0].Name != "GetUser" {
+		t.Errorf("Expected RPC 'GetUser', got %q", userSvc.RPCs[0].Name)
+	}
+	if userSvc.RPCs[1].Name != "ListUsers" {
+		t.Errorf("Expected RPC 'ListUsers', got %q", userSvc.RPCs[1].Name)
+	}
+	// ListUsers has server streaming response
+	if !userSvc.RPCs[1].ResponseType.IsStream() {
+		t.Error("Expected ListUsers response to be streaming")
+	}
+	if userSvc.RPCs[1].RequestType.IsStream() {
+		t.Error("Expected ListUsers request to NOT be streaming")
+	}
+
+	// Second service: EventService
+	eventSvc := pf.Services[1]
+	if eventSvc.Name != "EventService" {
+		t.Errorf("Expected service name 'EventService', got %q", eventSvc.Name)
+	}
+	if len(eventSvc.RPCs) != 3 {
+		t.Fatalf("Expected 3 RPCs in EventService, got %d", len(eventSvc.RPCs))
+	}
+	// PublishEvent has aggregate option
+	if len(eventSvc.RPCs[0].Options) != 1 || eventSvc.RPCs[0].Options[0].Name != "google.api.http" {
+		t.Errorf("Expected PublishEvent to have google.api.http option")
+	}
+	// StreamEvents is server streaming
+	if !eventSvc.RPCs[1].ResponseType.IsStream() {
+		t.Error("Expected SubscribeEvents response to be streaming")
+	}
+	// StreamEvents is bidi streaming
+	if !eventSvc.RPCs[2].RequestType.IsStream() || !eventSvc.RPCs[2].ResponseType.IsStream() {
+		t.Error("Expected StreamEvents to be bidirectional streaming")
+	}
+}
+
+// TestGRPCAdditionalBindings verifies parsing of gRPC HTTP annotations with
+// nested additional_bindings blocks (sub-messages without a colon separator).
+func TestGRPCAdditionalBindings(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/grpc_additional_bindings.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse grpc_additional_bindings.proto: %v", err)
+	}
+
+	if len(pf.Services) != 1 {
+		t.Fatalf("Expected 1 service, got %d", len(pf.Services))
+	}
+	svc := pf.Services[0]
+	if svc.Name != "MessagingService" {
+		t.Errorf("Expected service name 'MessagingService', got %q", svc.Name)
+	}
+	if len(svc.RPCs) != 1 {
+		t.Fatalf("Expected 1 RPC, got %d", len(svc.RPCs))
+	}
+
+	rpc := svc.RPCs[0]
+	if rpc.Name != "GetMessage" {
+		t.Errorf("Expected RPC name 'GetMessage', got %q", rpc.Name)
+	}
+	if len(rpc.Options) != 1 {
+		t.Fatalf("Expected 1 option on GetMessage, got %d", len(rpc.Options))
+	}
+
+	httpOpt := rpc.Options[0]
+	if httpOpt.Name != "google.api.http" {
+		t.Errorf("Expected option name 'google.api.http', got %q", httpOpt.Name)
+	}
+	if !httpOpt.IsAggregateValue {
+		t.Error("Expected aggregate value")
+	}
+	if !httpOpt.IsParenthesized {
+		t.Error("Expected parenthesized option name")
+	}
+	// Verify the aggregate value contains the primary path and additional_bindings
+	if !strings.Contains(httpOpt.Value, "/v1/messages/{message_id}") {
+		t.Errorf("Expected primary path in option value, got: %q", httpOpt.Value)
+	}
+	if !strings.Contains(httpOpt.Value, "additional_bindings") {
+		t.Errorf("Expected 'additional_bindings' in option value, got: %q", httpOpt.Value)
+	}
+	if !strings.Contains(httpOpt.Value, "/v1/users/{user_id}/messages/{message_id}") {
+		t.Errorf("Expected first additional binding path in option value, got: %q", httpOpt.Value)
+	}
+	if !strings.Contains(httpOpt.Value, "/v2/messages/{message_id}") {
+		t.Errorf("Expected second additional binding path in option value, got: %q", httpOpt.Value)
+	}
+}
+
+// TestGRPCAllStreamingPatterns verifies that all four gRPC streaming patterns
+// (unary, server, client, bidi) are correctly parsed with the right streaming flags.
+func TestGRPCAllStreamingPatterns(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/grpc_all_streaming.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse grpc_all_streaming.proto: %v", err)
+	}
+
+	if len(pf.Services) != 1 {
+		t.Fatalf("Expected 1 service, got %d", len(pf.Services))
+	}
+	svc := pf.Services[0]
+	if len(svc.RPCs) != 6 {
+		t.Fatalf("Expected 6 RPCs, got %d", len(svc.RPCs))
+	}
+
+	tests := []struct {
+		name           string
+		reqStream      bool
+		respStream     bool
+		expectedOptCnt int
+	}{
+		{name: "UnaryCall", reqStream: false, respStream: false, expectedOptCnt: 0},
+		{name: "ServerStream", reqStream: false, respStream: true, expectedOptCnt: 0},
+		{name: "ClientStream", reqStream: true, respStream: false, expectedOptCnt: 0},
+		{name: "BidiStream", reqStream: true, respStream: true, expectedOptCnt: 0},
+		{name: "ServerStreamWithOpts", reqStream: false, respStream: true, expectedOptCnt: 2},
+		{name: "BidiStreamWithAnnotation", reqStream: true, respStream: true, expectedOptCnt: 1},
+	}
+
+	for i, tt := range tests {
+		rpc := svc.RPCs[i]
+		if rpc.Name != tt.name {
+			t.Errorf("RPC %d: expected name %q, got %q", i, tt.name, rpc.Name)
+		}
+		if rpc.RequestType.IsStream() != tt.reqStream {
+			t.Errorf("RPC %q: expected request streaming=%v, got %v", tt.name, tt.reqStream, rpc.RequestType.IsStream())
+		}
+		if rpc.ResponseType.IsStream() != tt.respStream {
+			t.Errorf("RPC %q: expected response streaming=%v, got %v", tt.name, tt.respStream, rpc.ResponseType.IsStream())
+		}
+		if len(rpc.Options) != tt.expectedOptCnt {
+			t.Errorf("RPC %q: expected %d options, got %d", tt.name, tt.expectedOptCnt, len(rpc.Options))
+		}
+	}
+
+	// Verify ServerStreamWithOpts has both simple options
+	rpc4 := svc.RPCs[4]
+	if rpc4.Options[0].Name != "deprecated" {
+		t.Errorf("Expected first option 'deprecated', got %q", rpc4.Options[0].Name)
+	}
+	if rpc4.Options[1].Name != "custom_opt" || !rpc4.Options[1].IsParenthesized {
+		t.Errorf("Expected second option '(custom_opt)', got name=%q parens=%v",
+			rpc4.Options[1].Name, rpc4.Options[1].IsParenthesized)
+	}
+
+	// Verify BidiStreamWithAnnotation has aggregate option
+	rpc5 := svc.RPCs[5]
+	if !rpc5.Options[0].IsAggregateValue {
+		t.Error("Expected BidiStreamWithAnnotation option to be aggregate")
+	}
+}
+
+// TestGRPCMultipleRPCOptions verifies that RPCs with multiple options
+// (both simple and aggregate) in a single body are parsed correctly.
+func TestGRPCMultipleRPCOptions(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/grpc_multiple_rpc_options.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse grpc_multiple_rpc_options.proto: %v", err)
+	}
+
+	if len(pf.Services) != 1 {
+		t.Fatalf("Expected 1 service, got %d", len(pf.Services))
+	}
+	svc := pf.Services[0]
+	if svc.Name != "AnnotatedService" {
+		t.Errorf("Expected service name 'AnnotatedService', got %q", svc.Name)
+	}
+	if len(svc.RPCs) != 2 {
+		t.Fatalf("Expected 2 RPCs, got %d", len(svc.RPCs))
+	}
+
+	// HeavilyAnnotated should have 4 options
+	rpc0 := svc.RPCs[0]
+	if rpc0.Name != "HeavilyAnnotated" {
+		t.Errorf("Expected RPC name 'HeavilyAnnotated', got %q", rpc0.Name)
+	}
+	if len(rpc0.Options) != 4 {
+		t.Fatalf("Expected 4 options on HeavilyAnnotated, got %d", len(rpc0.Options))
+	}
+	// option deprecated = true
+	if rpc0.Options[0].Name != "deprecated" || rpc0.Options[0].Value != "true" {
+		t.Errorf("Option 0: expected deprecated=true, got %s=%s", rpc0.Options[0].Name, rpc0.Options[0].Value)
+	}
+	// option (google.api.http) = {...}
+	if rpc0.Options[1].Name != "google.api.http" || !rpc0.Options[1].IsAggregateValue || !rpc0.Options[1].IsParenthesized {
+		t.Errorf("Option 1: expected (google.api.http) aggregate, got name=%q agg=%v parens=%v",
+			rpc0.Options[1].Name, rpc0.Options[1].IsAggregateValue, rpc0.Options[1].IsParenthesized)
+	}
+	// option (custom.auth) = {...}
+	if rpc0.Options[2].Name != "custom.auth" || !rpc0.Options[2].IsAggregateValue || !rpc0.Options[2].IsParenthesized {
+		t.Errorf("Option 2: expected (custom.auth) aggregate, got name=%q agg=%v parens=%v",
+			rpc0.Options[2].Name, rpc0.Options[2].IsAggregateValue, rpc0.Options[2].IsParenthesized)
+	}
+	// option idempotency_level = IDEMPOTENT
+	if rpc0.Options[3].Name != "idempotency_level" || rpc0.Options[3].Value != "IDEMPOTENT" {
+		t.Errorf("Option 3: expected idempotency_level=IDEMPOTENT, got %s=%s",
+			rpc0.Options[3].Name, rpc0.Options[3].Value)
+	}
+
+	// SimpleOptions should have 2 options
+	rpc1 := svc.RPCs[1]
+	if rpc1.Name != "SimpleOptions" {
+		t.Errorf("Expected RPC name 'SimpleOptions', got %q", rpc1.Name)
+	}
+	if len(rpc1.Options) != 2 {
+		t.Fatalf("Expected 2 options on SimpleOptions, got %d", len(rpc1.Options))
+	}
+	if rpc1.Options[0].Name != "deprecated" {
+		t.Errorf("Expected first option 'deprecated', got %q", rpc1.Options[0].Name)
+	}
+	if rpc1.Options[1].Name != "idempotency_level" || rpc1.Options[1].Value != "NO_SIDE_EFFECTS" {
+		t.Errorf("Expected second option idempotency_level=NO_SIDE_EFFECTS, got %s=%s",
+			rpc1.Options[1].Name, rpc1.Options[1].Value)
+	}
+}
+
+// TestGRPCEmptyMessageRPC verifies that RPCs using empty messages (like
+// google.protobuf.Empty stand-ins) as request or response types parse correctly.
+func TestGRPCEmptyMessageRPC(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/grpc_empty_message_rpc.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse grpc_empty_message_rpc.proto: %v", err)
+	}
+
+	if len(pf.Services) != 1 {
+		t.Fatalf("Expected 1 service, got %d", len(pf.Services))
+	}
+	svc := pf.Services[0]
+	if svc.Name != "HealthService" {
+		t.Errorf("Expected service name 'HealthService', got %q", svc.Name)
+	}
+	if len(svc.RPCs) != 3 {
+		t.Fatalf("Expected 3 RPCs, got %d", len(svc.RPCs))
+	}
+
+	// Check: Empty request, StatusResponse response
+	check := svc.RPCs[0]
+	if check.Name != "Check" {
+		t.Errorf("Expected RPC name 'Check', got %q", check.Name)
+	}
+	if check.RequestType.Name() != "Empty" {
+		t.Errorf("Expected Check request type 'Empty', got %q", check.RequestType.Name())
+	}
+	if check.ResponseType.Name() != "StatusResponse" {
+		t.Errorf("Expected Check response type 'StatusResponse', got %q", check.ResponseType.Name())
+	}
+
+	// Shutdown: PingRequest request, Empty response
+	shutdown := svc.RPCs[1]
+	if shutdown.Name != "Shutdown" {
+		t.Errorf("Expected RPC name 'Shutdown', got %q", shutdown.Name)
+	}
+	if shutdown.RequestType.Name() != "PingRequest" {
+		t.Errorf("Expected Shutdown request type 'PingRequest', got %q", shutdown.RequestType.Name())
+	}
+	if shutdown.ResponseType.Name() != "Empty" {
+		t.Errorf("Expected Shutdown response type 'Empty', got %q", shutdown.ResponseType.Name())
+	}
+
+	// Noop: Empty on both sides with option
+	noop := svc.RPCs[2]
+	if noop.Name != "Noop" {
+		t.Errorf("Expected RPC name 'Noop', got %q", noop.Name)
+	}
+	if noop.RequestType.Name() != "Empty" {
+		t.Errorf("Expected Noop request type 'Empty', got %q", noop.RequestType.Name())
+	}
+	if noop.ResponseType.Name() != "Empty" {
+		t.Errorf("Expected Noop response type 'Empty', got %q", noop.ResponseType.Name())
+	}
+	if len(noop.Options) != 1 || noop.Options[0].Name != "deprecated" {
+		t.Errorf("Expected Noop to have 1 'deprecated' option, got %d options", len(noop.Options))
+	}
+}

@@ -1,0 +1,27 @@
+syntax = "proto3";
+package emptymsgrpc;
+
+// Empty is a local stand-in for google.protobuf.Empty
+message Empty {
+}
+
+message StatusResponse {
+  string status = 1;
+}
+
+message PingRequest {
+  string data = 1;
+}
+
+service HealthService {
+  // RPC with empty request message
+  rpc Check (Empty) returns (StatusResponse);
+
+  // RPC with empty response message
+  rpc Shutdown (PingRequest) returns (Empty);
+
+  // RPC with empty on both sides
+  rpc Noop (Empty) returns (Empty) {
+    option deprecated = true;
+  }
+}

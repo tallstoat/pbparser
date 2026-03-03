@@ -1,0 +1,38 @@
+syntax = "proto3";
+package multiservice;
+
+message Request {
+  string id = 1;
+}
+
+message Response {
+  string result = 1;
+}
+
+message Event {
+  string name = 1;
+  string payload = 2;
+}
+
+message Ack {
+  bool ok = 1;
+}
+
+// UserService handles user-related RPCs
+service UserService {
+  option deprecated = true;
+  rpc GetUser (Request) returns (Response);
+  rpc ListUsers (Request) returns (stream Response);
+}
+
+// EventService handles event-related RPCs
+service EventService {
+  rpc PublishEvent (Event) returns (Ack) {
+    option (google.api.http) = {
+      post: "/v1/events"
+      body: "*"
+    };
+  }
+  rpc SubscribeEvents (Request) returns (stream Event);
+  rpc StreamEvents (stream Event) returns (stream Ack);
+}
