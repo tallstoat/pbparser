@@ -344,19 +344,20 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 		if inSamePkg {
 			orcl := m[mainpkg]
 
-			var msgMatchTerm, enumMatchTerm string
+			var matchTerm string
 			if !strings.HasPrefix(f.category, mainpkg+".") {
-				msgMatchTerm = mainpkg + "." + f.category
-				enumMatchTerm = mainpkg + "." + f.category
+				matchTerm = mainpkg + "." + f.category
 			} else {
-				msgMatchTerm = f.category
-				enumMatchTerm = f.category
+				matchTerm = f.category
 			}
 
 			// Check against normal and nested messages & enums in same package
-			found = orcl.msgmap[msgMatchTerm]
-			if !found {
-				found = orcl.enummap[enumMatchTerm]
+			found = orcl.msgmap[matchTerm] || orcl.enummap[matchTerm]
+
+			// If not found, try resolving relative to the enclosing message
+			if !found && f.msg.QualifiedName != "" {
+				relTerm := f.msg.QualifiedName + "." + f.category
+				found = orcl.msgmap[relTerm] || orcl.enummap[relTerm]
 			}
 		} else {
 			orcl := m[pkgName]
@@ -405,10 +406,18 @@ func validateRPCDataType(mainpkg string, service string, rpc string, datatype Na
 }
 
 func isDatatypeInSamePackage(datatypeName string, packageNames []string) (bool, string) {
+	// Match the longest (most specific) package name to handle nested
+	// packages correctly (e.g., prefer "a.b.c" over "a.b" for type "a.b.c.Foo").
+	bestPkg := ""
 	for _, pkg := range packageNames {
 		if strings.HasPrefix(datatypeName, pkg+".") {
-			return false, pkg
+			if len(pkg) > len(bestPkg) {
+				bestPkg = pkg
+			}
 		}
+	}
+	if bestPkg != "" {
+		return false, bestPkg
 	}
 	return true, ""
 }

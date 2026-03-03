@@ -1,0 +1,22 @@
+syntax = "proto3";
+package a;
+
+import "mid.proto";
+import "leaf.proto";
+
+message Container {
+  message Nested {
+    message Deep {
+      string val = 1;
+    }
+  }
+
+  a.b.MidMsg mid_ref = 1;
+  a.b.c.LeafMsg leaf_ref = 2;
+  Nested.Deep deep_ref = 3;
+}
+
+service TestService {
+  rpc GetMid(a.b.MidMsg) returns (a.b.c.LeafMsg);
+  rpc GetDeep(Container.Nested.Deep) returns (Container);
+}

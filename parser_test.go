@@ -711,3 +711,46 @@ func TestGroup(t *testing.T) {
 		t.Errorf("Expected field 'query', got %q", msg.Fields[0].Name)
 	}
 }
+
+// TestDeepNestResolution verifies that cross-package type resolution works
+// correctly with deeply nested packages (e.g., a, a.b, a.b.c) and with
+// nested message type references.
+func TestDeepNestResolution(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/deepnest/main.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse deepnest/main.proto: %v", err)
+	}
+
+	if pf.PackageName != "a" {
+		t.Errorf("Expected package 'a', got %q", pf.PackageName)
+	}
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+
+	msg := pf.Messages[0]
+	if msg.Name != "Container" {
+		t.Errorf("Expected message 'Container', got %q", msg.Name)
+	}
+	if len(msg.Fields) != 3 {
+		t.Fatalf("Expected 3 fields, got %d", len(msg.Fields))
+	}
+
+	// Field referencing a.b.MidMsg
+	if msg.Fields[0].Type.Name() != "a.b.MidMsg" {
+		t.Errorf("Expected type 'a.b.MidMsg', got %q", msg.Fields[0].Type.Name())
+	}
+	// Field referencing a.b.c.LeafMsg
+	if msg.Fields[1].Type.Name() != "a.b.c.LeafMsg" {
+		t.Errorf("Expected type 'a.b.c.LeafMsg', got %q", msg.Fields[1].Type.Name())
+	}
+
+	// Services
+	if len(pf.Services) != 1 {
+		t.Fatalf("Expected 1 service, got %d", len(pf.Services))
+	}
+	svc := pf.Services[0]
+	if len(svc.RPCs) != 2 {
+		t.Fatalf("Expected 2 RPCs, got %d", len(svc.RPCs))
+	}
+}
