@@ -1,0 +1,8 @@
+/****** test ******/
+syntax = "proto3";
+package starcomment;
+
+/* another ** tricky ** comment */
+message Foo {
+  string bar = 1;
+}

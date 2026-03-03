@@ -1188,14 +1188,15 @@ func (p *parser) readMultiLineComment() string {
 	var buf bytes.Buffer
 	for {
 		c := p.read()
-		if c != '*' {
-			_, _ = buf.WriteRune(c)
-		} else {
+		if c == '*' {
 			c2 := p.read()
 			if c2 == '/' {
 				break
 			}
-			_, _ = buf.WriteRune(c2)
+			_, _ = buf.WriteRune(c)
+			p.unread()
+		} else {
+			_, _ = buf.WriteRune(c)
 		}
 	}
 	str := buf.String()

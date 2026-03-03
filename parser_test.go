@@ -784,3 +784,22 @@ func TestSiblingNestedMessageRef(t *testing.T) {
 		t.Errorf("Expected nested message 'City', got %q", result.Messages[1].Name)
 	}
 }
+
+// TestMultiLineCommentWithStars verifies that multi-line comments containing
+// consecutive asterisks do not cause an infinite loop (issue #11).
+func TestMultiLineCommentWithStars(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/star_comment.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse star_comment.proto: %v", err)
+	}
+
+	if pf.PackageName != "starcomment" {
+		t.Errorf("Expected package 'starcomment', got %q", pf.PackageName)
+	}
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+	if pf.Messages[0].Name != "Foo" {
+		t.Errorf("Expected message 'Foo', got %q", pf.Messages[0].Name)
+	}
+}
