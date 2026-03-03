@@ -905,16 +905,20 @@ func (p *parser) readImport(pf *ProtoFile) error {
 		}
 		pf.Dependencies = append(pf.Dependencies, importString)
 	} else {
-		publicStr := p.readWord()
-		if "public" != publicStr {
-			return p.errline("Expected 'public', but found: %v", publicStr)
+		modifier := p.readWord()
+		if modifier != "public" && modifier != "weak" {
+			return p.errline("Expected 'public' or 'weak', but found: %v", modifier)
 		}
 		p.skipWhitespace()
 		importString, err := p.readQuotedString(f)
 		if err != nil {
 			return err
 		}
-		pf.PublicDependencies = append(pf.PublicDependencies, importString)
+		if modifier == "public" {
+			pf.PublicDependencies = append(pf.PublicDependencies, importString)
+		} else {
+			pf.WeakDependencies = append(pf.WeakDependencies, importString)
+		}
 	}
 	if c := p.read(); c != ';' {
 		return p.throw(';', c)

@@ -156,6 +156,7 @@ type ProtoFile struct {
 	Edition            string
 	Dependencies       []string
 	PublicDependencies []string
+	WeakDependencies   []string
 	Options            []OptionElement
 	Enums              []EnumElement
 	Messages           []MessageElement

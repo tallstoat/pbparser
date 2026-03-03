@@ -1,0 +1,8 @@
+syntax = "proto2";
+package weaktest;
+
+import weak "nonexistent/missing.proto";
+
+message Foo {
+  optional string name = 1;
+}

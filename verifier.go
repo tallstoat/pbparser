@@ -18,7 +18,7 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		return err
 	}
 
-	if (len(pf.Dependencies) > 0 || len(pf.PublicDependencies) > 0) && p == nil {
+	if (len(pf.Dependencies) > 0 || len(pf.PublicDependencies) > 0 || len(pf.WeakDependencies) > 0) && p == nil {
 		return errors.New("ImportModuleProvider is required to validate imports")
 	}
 
@@ -33,6 +33,8 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 	if err := parseDependencies(p, pf.PublicDependencies, m); err != nil {
 		return err
 	}
+	// parse the weak dependencies (best-effort; failures are ignored)...
+	parseWeakDependencies(p, pf.WeakDependencies, m)
 
 	// make oracle for main package and add to map...
 	orcl := protoFileOracle{pf: pf}
@@ -120,6 +122,9 @@ func merge(dest *ProtoFile, src *ProtoFile) {
 	}
 	for _, d := range src.PublicDependencies {
 		dest.PublicDependencies = append(dest.PublicDependencies, d)
+	}
+	for _, d := range src.WeakDependencies {
+		dest.WeakDependencies = append(dest.WeakDependencies, d)
 	}
 	for _, d := range src.Options {
 		dest.Options = append(dest.Options, d)
@@ -471,4 +476,37 @@ func parseDependencies(impr ImportModuleProvider, dependencies []string, m map[s
 		}
 	}
 	return nil
+}
+
+func parseWeakDependencies(impr ImportModuleProvider, dependencies []string, m map[string]protoFileOracle) {
+	for _, d := range dependencies {
+		r, err := impr.Provide(d)
+		if err != nil || r == nil {
+			// weak imports are optional; skip if unavailable
+			continue
+		}
+
+		dpf := ProtoFile{}
+		if err := parse(r, &dpf); err != nil {
+			continue
+		}
+
+		if err := validateSyntaxOrEdition(&dpf); err != nil {
+			continue
+		}
+
+		orcl := protoFileOracle{pf: &dpf}
+		orcl.msgmap, orcl.enummap = makeQNameLookup(&dpf)
+
+		if _, found := m[dpf.PackageName]; found {
+			for k, v := range orcl.msgmap {
+				m[dpf.PackageName].msgmap[k] = v
+			}
+			for k, v := range orcl.enummap {
+				m[dpf.PackageName].enummap[k] = v
+			}
+		} else {
+			m[dpf.PackageName] = orcl
+		}
+	}
 }

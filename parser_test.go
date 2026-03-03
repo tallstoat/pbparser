@@ -66,7 +66,7 @@ func TestParseErrors(t *testing.T) {
 		{file: "missing-msg.proto", expectedErrors: []string{"Datatype: 'TaskDetails' referenced in field: 'details' is not defined"}},
 		{file: "missing-package.proto", expectedErrors: []string{"Datatype: 'abcd.TaskDetails' referenced in field: 'details' is not defined"}},
 		{file: "wrong-import.proto", expectedErrors: []string{"ImportModuleReader is unable to provide content of dependency module"}},
-		{file: "wrong-import2.proto", expectedErrors: []string{"Expected 'public'"}},
+		{file: "wrong-import2.proto", expectedErrors: []string{"Expected 'public' or 'weak'"}},
 		{file: "wrong-import3.proto", expectedErrors: []string{"Expected '\"'"}},
 		{file: "wrong-public-import.proto", expectedErrors: []string{"ImportModuleReader is unable to provide content of dependency module"}},
 		{file: "wrong-rpc-datatype.proto", expectedErrors: []string{"Datatype: 'TaskId' referenced in RPC: 'AddTask' of Service: 'LogTask' is not defined"}},
@@ -612,5 +612,38 @@ func TestEdition2023(t *testing.T) {
 	}
 	if len(pf.Services[0].RPCs) != 2 {
 		t.Fatalf("Expected 2 RPCs, got %d", len(pf.Services[0].RPCs))
+	}
+}
+
+// TestWeakImport verifies that weak imports are parsed and stored,
+// and that missing weak imports do not cause errors.
+func TestWeakImport(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/weak_import.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse weak_import.proto: %v", err)
+	}
+
+	// Weak dependency should be recorded
+	if len(pf.WeakDependencies) != 1 {
+		t.Fatalf("Expected 1 weak dependency, got %d", len(pf.WeakDependencies))
+	}
+	if pf.WeakDependencies[0] != "nonexistent/missing.proto" {
+		t.Errorf("Expected weak dependency 'nonexistent/missing.proto', got %q", pf.WeakDependencies[0])
+	}
+
+	// Regular dependencies should be empty
+	if len(pf.Dependencies) != 0 {
+		t.Errorf("Expected 0 regular dependencies, got %d", len(pf.Dependencies))
+	}
+	if len(pf.PublicDependencies) != 0 {
+		t.Errorf("Expected 0 public dependencies, got %d", len(pf.PublicDependencies))
+	}
+
+	// Message should still parse fine
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+	if pf.Messages[0].Name != "Foo" {
+		t.Errorf("Expected message 'Foo', got %q", pf.Messages[0].Name)
 	}
 }
