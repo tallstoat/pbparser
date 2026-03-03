@@ -8,10 +8,14 @@ import (
 	"unicode/utf8"
 )
 
+// readWord reads consecutive valid word characters from the input and returns
+// them as a string. Word characters include letters, digits, underscore, hyphen, and dot.
 func (p *parser) readWord() string {
 	return p.readWordAdvanced(nil)
 }
 
+// readWordAdvanced reads consecutive valid word characters from the input, using
+// the optional function f to accept additional characters beyond the defaults.
 func (p *parser) readWordAdvanced(f func(r rune) bool) string {
 	p.wordBuf = p.wordBuf[:0]
 	var tmp [utf8.UTFMax]byte
@@ -28,6 +32,8 @@ func (p *parser) readWordAdvanced(f func(r rune) bool) string {
 	return string(p.wordBuf)
 }
 
+// readIntLiteral reads an integer literal from the input, supporting decimal,
+// hexadecimal (0x/0X prefix), and octal (leading 0) formats.
 func (p *parser) readIntLiteral() (int, error) {
 	var buf bytes.Buffer
 	c := p.read()
@@ -73,6 +79,8 @@ func (p *parser) readIntLiteral() (int, error) {
 	return int(intVal), err
 }
 
+// readDocumentation reads a comment that started with '/'. It dispatches to
+// single-line (//) or multi-line (/* */) comment reading based on the next character.
 func (p *parser) readDocumentation() (string, error) {
 	c := p.read()
 	if c == '/' {
@@ -83,6 +91,8 @@ func (p *parser) readDocumentation() (string, error) {
 	return "", p.errline("Expected '/' or '*', but found: %v", strconv.QuoteRune(c))
 }
 
+// readMultiLineComment reads a multi-line comment body (the opening /* has already
+// been consumed) until the closing */ is found, and returns the trimmed content.
 func (p *parser) readMultiLineComment() string {
 	var buf bytes.Buffer
 	for {
@@ -102,7 +112,8 @@ func (p *parser) readMultiLineComment() string {
 	return strings.TrimSpace(str)
 }
 
-// Reads one or multiple single line comments
+// readSingleLineComment reads one or multiple consecutive single-line comments,
+// joining them with spaces into a single documentation string.
 func (p *parser) readSingleLineComment() string {
 	str := strings.TrimSpace(p.readUntilNewline())
 	for {
@@ -120,6 +131,9 @@ func (p *parser) readSingleLineComment() string {
 	return str
 }
 
+// readUntil reads characters from the input until the delimiter rune is encountered.
+// It handles escape sequences within quoted strings (when the delimiter is a quote character),
+// including hex (\x, \u, \U) and octal escape sequences.
 func (p *parser) readUntil(delimiter rune) string {
 	var buf bytes.Buffer
 	for {
@@ -185,14 +199,17 @@ func (p *parser) readEscapeOctalDigits(buf *bytes.Buffer) {
 	}
 }
 
+// isOctalDigit reports whether c is an octal digit (0-7).
 func isOctalDigit(c rune) bool {
 	return c >= '0' && c <= '7'
 }
 
+// readUntilNewline reads characters from the input until a newline is encountered.
 func (p *parser) readUntilNewline() string {
 	return p.readUntil('\n')
 }
 
+// skipUntilNewline discards characters from the input until a newline or EOF is reached.
 func (p *parser) skipUntilNewline() {
 	for {
 		c := p.read()
@@ -243,6 +260,8 @@ func (p *parser) readInlineComment() string {
 	return ""
 }
 
+// unread pushes the last read rune back onto the input, restoring the previous
+// line and column position.
 func (p *parser) unread() {
 	if p.loc.column == 0 {
 		p.loc.line--
@@ -251,6 +270,8 @@ func (p *parser) unread() {
 	_ = p.br.UnreadRune()
 }
 
+// read reads the next rune from the input, updating the line and column tracking.
+// Returns the eof sentinel on read error or end of input.
 func (p *parser) read() rune {
 	c, _, err := p.br.ReadRune()
 	if err != nil {
@@ -268,6 +289,8 @@ func (p *parser) read() rune {
 	return c
 }
 
+// skipWhitespace advances the reader past any whitespace characters (spaces,
+// tabs, carriage returns, newlines), stopping at the first non-whitespace or EOF.
 func (p *parser) skipWhitespace() {
 	for {
 		c := p.read()
@@ -281,6 +304,8 @@ func (p *parser) skipWhitespace() {
 	}
 }
 
+// stripParenthesis removes surrounding parentheses from a string if present,
+// returning the stripped string and true. Returns the original string and false otherwise.
 func stripParenthesis(s string) (string, bool) {
 	if s[0] == '(' && s[len(s)-1] == ')' {
 		return s[1 : len(s)-1], true
@@ -288,6 +313,9 @@ func stripParenthesis(s string) (string, bool) {
 	return s, false
 }
 
+// isValidCharInWord reports whether c is a valid character within a word token.
+// Letters, digits, underscore, hyphen, and dot are always valid. The optional
+// function f can accept additional characters.
 func isValidCharInWord(c rune, f func(r rune) bool) bool {
 	if isLetter(c) || isDigit(c) || c == '_' || c == '-' || c == '.' {
 		return true
@@ -297,32 +325,37 @@ func isValidCharInWord(c rune, f func(r rune) bool) bool {
 	return false
 }
 
+// isStartOfComment reports whether c could be the start of a comment (/).
 func isStartOfComment(c rune) bool {
 	return c == '/'
 }
 
+// isWhitespace reports whether c is a whitespace character (space, tab, carriage return, newline).
 func isWhitespace(c rune) bool {
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n'
 }
 
+// isLetter reports whether c is an ASCII letter (a-z or A-Z).
 func isLetter(c rune) bool {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
+// isDigit reports whether c is an ASCII digit (0-9).
 func isDigit(c rune) bool {
 	return (c >= '0' && c <= '9')
 }
 
+// isHexDigit reports whether c is a hexadecimal digit (0-9, a-f, A-F).
 func isHexDigit(c rune) bool {
 	return isDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
 }
 
 var eof = rune(0)
 
-// enclousure used to bound/enclose a string
+// enclosure used to bound/enclose a string
 type enclosure int
 
-// enclosure the type of enclosures
+// enclosure constants define the types of enclosures.
 const (
 	parenthesis enclosure = iota
 	bracket

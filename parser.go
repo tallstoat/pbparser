@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 )
 
-// Parse function parses the protobuf content passed to it by the the client code via
+// Parse function parses the protobuf content passed to it by the client code via
 // the reader. It also uses the passed-in ImportModuleProvider to callback the client
 // code for any imports in the protobuf content. If there are no imports, the client
 // can choose to pass this as nil.
@@ -64,7 +64,7 @@ func ParseFile(file string) (ProtoFile, error) {
 }
 
 // parse is an internal function which is invoked with the reader for the main proto file
-// & a pointer to the ProtoFile struct to be populated post parsing & verification.
+// & a pointer to the ProtoFile struct to be populated post parsing.
 func parse(r io.Reader, pf *ProtoFile) error {
 	br := bufio.NewReader(r)
 
@@ -94,12 +94,12 @@ type parser struct {
 	wordBuf        []byte         // reusable scratch buffer for readWord
 }
 
+// currentLoc returns the current source location of the parser as a SourceLocation.
 func (p *parser) currentLoc() SourceLocation {
 	return SourceLocation{Line: p.loc.line, Column: p.loc.column}
 }
 
-// This function just looks for documentation and
-// then declaration in a loop till EOF is reached
+// parse looks for documentation and then declaration in a loop till EOF is reached.
 func (p *parser) parse(pf *ProtoFile) error {
 	for {
 		// read any documentation if found...
@@ -129,6 +129,9 @@ func (p *parser) parse(pf *ProtoFile) error {
 	return nil
 }
 
+// readDocumentationIfFound reads any documentation comment (single-line or multi-line)
+// that precedes a declaration, skipping whitespace. If no comment is found, it unreads
+// the last character and returns an empty string.
 func (p *parser) readDocumentationIfFound() (string, error) {
 	for {
 		c := p.read()
@@ -152,6 +155,9 @@ func (p *parser) readDocumentationIfFound() (string, error) {
 	return "", nil
 }
 
+// readDeclaration reads a single protobuf declaration (e.g. package, syntax, import,
+// option, message, enum, service, etc.) and populates the ProtoFile accordingly.
+// The parseCtx determines which declaration types are permitted at the current nesting level.
 func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	// Skip unnecessary semicolons...
 	c := p.read()
@@ -246,6 +252,9 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 	return nil
 }
 
+// readDeclarationsInLoop reads declarations inside a brace-delimited block (e.g. message,
+// enum, service body) until a closing '}' is encountered. It handles documentation
+// comments between declarations and returns an error if EOF is reached before the block ends.
 func (p *parser) readDeclarationsInLoop(pf *ProtoFile, ctx parseCtx) error {
 	for {
 		doc, err := p.readDocumentationIfFound()

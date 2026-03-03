@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// readReserved parses a 'reserved' declaration, dispatching to range or name
+// parsing depending on whether the next token is a number or a quoted string.
+// It handles both message and enum contexts.
 func (p *parser) readReserved(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	c := p.read()
@@ -28,6 +31,8 @@ func (p *parser) readReserved(pf *ProtoFile, documentation string, ctx parseCtx)
 	return p.readReservedNames(documentation, me)
 }
 
+// readReservedRanges parses comma-separated reserved field number ranges
+// (e.g. "1, 5 to 10, 15 to max") in a message and appends them to the MessageElement.
 func (p *parser) readReservedRanges(documentation string, me *MessageElement) error {
 	for {
 		start, err := p.readIntLiteral()
@@ -78,6 +83,8 @@ func (p *parser) readReservedRanges(documentation string, me *MessageElement) er
 	return nil
 }
 
+// readReservedNames parses comma-separated quoted reserved field names
+// (e.g. "foo", "bar") in a message and appends them to the MessageElement.
 func (p *parser) readReservedNames(documentation string, me *MessageElement) error {
 	for {
 		name, err := p.readQuotedString(nil)
@@ -101,6 +108,9 @@ func (p *parser) readReservedNames(documentation string, me *MessageElement) err
 	return nil
 }
 
+// readReservedRangesEnum parses comma-separated reserved value ranges
+// (e.g. "-1, 5 to 10, 15 to max") in an enum and appends them to the EnumElement.
+// Unlike message reserved ranges, enum ranges allow negative values.
 func (p *parser) readReservedRangesEnum(documentation string, ee *EnumElement) error {
 	for {
 		p.skipWhitespace()
@@ -149,6 +159,8 @@ func (p *parser) readReservedRangesEnum(documentation string, ee *EnumElement) e
 	return nil
 }
 
+// readReservedNamesEnum parses comma-separated quoted reserved value names
+// in an enum and appends them to the EnumElement.
 func (p *parser) readReservedNamesEnum(documentation string, ee *EnumElement) error {
 	for {
 		name, err := p.readQuotedString(nil)
@@ -169,6 +181,7 @@ func (p *parser) readReservedNamesEnum(documentation string, ee *EnumElement) er
 	return nil
 }
 
+// readSignedInt reads an optionally negative integer literal from the input.
 func (p *parser) readSignedInt() (int, error) {
 	negative := false
 	c := p.read()
@@ -187,6 +200,9 @@ func (p *parser) readSignedInt() (int, error) {
 	return val, nil
 }
 
+// readField parses a message field declaration including its label, type, name, tag,
+// and any inline options. It validates constraints such as disallowing required fields
+// in proto3, map key type restrictions, and correct context usage.
 func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
 	if label == required && (pf.Syntax == proto3 || pf.Edition != "") {
 		return p.errline("Required fields are not allowed in proto3")
@@ -294,6 +310,8 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	return nil
 }
 
+// readGroup parses a proto2 group declaration, which defines an inline message type
+// with a field tag. Groups are not allowed in proto3 or editions.
 func (p *parser) readGroup(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
@@ -362,6 +380,8 @@ func (p *parser) readListOptionsOnALine() ([]OptionElement, string, error) {
 	return options, inlineComment, nil
 }
 
+// readListOptions parses bracketed option assignments (e.g. name = value) separated
+// by commas until a closing ']' is encountered. The opening '[' must already be consumed.
 func (p *parser) readListOptions() ([]OptionElement, error) {
 	var options []OptionElement
 	for {
@@ -399,6 +419,8 @@ func (p *parser) readListOptions() ([]OptionElement, error) {
 	return options, nil
 }
 
+// readOption parses a top-level or nested 'option' statement (e.g. option java_package = "com.example";)
+// and appends it to the appropriate parent element based on the current parse context.
 func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	var err error
 	var enc enclosure
@@ -537,6 +559,9 @@ func (p *parser) readAggregateValue() (string, error) {
 	return strings.TrimSpace(buf.String()), nil
 }
 
+// readMessage parses a 'message' declaration including its name, body of nested
+// declarations (fields, enums, nested messages, etc.), and adds it to the ProtoFile
+// or parent message. It manages the qualified name prefix for nested types.
 func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
@@ -577,6 +602,9 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) 
 	return nil
 }
 
+// readExtensions parses an 'extensions' declaration that defines extension field number
+// ranges for a message (e.g. "extensions 100 to 199, 500 to max;"). It also handles
+// optional compact options on the ranges. Not allowed in proto3.
 func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	if pf.Syntax == proto3 {
 		return p.errline("Extension ranges are not allowed in proto3")
@@ -659,6 +687,8 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 	return nil
 }
 
+// readEnumConstant parses an enum constant declaration (e.g. "FOO = 1;") including
+// its name, tag value, any inline options, and inline comment.
 func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
@@ -683,6 +713,8 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 	return nil
 }
 
+// readOneOf parses a 'oneof' declaration including its name and body of fields,
+// and appends it to the parent MessageElement.
 func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
@@ -707,6 +739,8 @@ func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) er
 	return nil
 }
 
+// readExtend parses an 'extend' declaration including its target type name and body
+// of extension fields, and adds it to the ProtoFile or parent message.
 func (p *parser) readExtend(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
@@ -739,6 +773,8 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string, ctx parseCtx) e
 	return nil
 }
 
+// readRPC parses an 'rpc' declaration including its name, request/response types
+// (with optional streaming), and an optional body of RPC options.
 func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
@@ -819,6 +855,8 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 	return nil
 }
 
+// readService parses a 'service' declaration including its name and body
+// of RPC methods and options, and appends it to the ProtoFile.
 func (p *parser) readService(pf *ProtoFile, documentation string) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
@@ -841,6 +879,8 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 	return nil
 }
 
+// readEnum parses an 'enum' declaration including its name and body of constants
+// and options, and adds it to the ProtoFile or parent message.
 func (p *parser) readEnum(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	p.skipWhitespace()
 	name, _, err := p.readName()
@@ -868,6 +908,8 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string, ctx parseCtx) err
 	return nil
 }
 
+// readImport parses an 'import' statement, handling regular, public, and weak imports.
+// The imported path is appended to the corresponding dependency list in the ProtoFile.
 func (p *parser) readImport(pf *ProtoFile) error {
 	// Define special matching function to match file path separator char
 	f := func(r rune) bool {
@@ -905,6 +947,8 @@ func (p *parser) readImport(pf *ProtoFile) error {
 	return nil
 }
 
+// readSyntax parses a 'syntax' statement (e.g. syntax = "proto3";) and sets
+// the Syntax field on the ProtoFile. Only "proto2" and "proto3" are accepted.
 func (p *parser) readSyntax(pf *ProtoFile) error {
 	p.skipWhitespace()
 	if c := p.read(); c != '=' {
@@ -925,6 +969,8 @@ func (p *parser) readSyntax(pf *ProtoFile) error {
 	return nil
 }
 
+// readEdition parses an 'edition' statement (e.g. edition = "2023";) and sets
+// the Edition field on the ProtoFile. Cannot coexist with a 'syntax' statement.
 func (p *parser) readEdition(pf *ProtoFile) error {
 	if pf.Syntax != "" {
 		return p.errline("Cannot specify both 'syntax' and 'edition'")
@@ -948,6 +994,9 @@ func (p *parser) readEdition(pf *ProtoFile) error {
 	return nil
 }
 
+// readQuotedString reads a single or double quoted string literal, supporting
+// string concatenation of adjacent literals. The optional function f provides
+// additional valid characters for the string content (e.g. '/' for file paths).
 func (p *parser) readQuotedString(f func(r rune) bool) (string, error) {
 	quote := p.read()
 	if quote != '"' && quote != '\'' {
@@ -975,6 +1024,8 @@ func (p *parser) readQuotedString(f func(r rune) bool) (string, error) {
 	return str, nil
 }
 
+// readRequestResponseType parses an RPC request or response type, handling the
+// optional 'stream' keyword prefix for streaming RPCs.
 func (p *parser) readRequestResponseType() (NamedDataType, error) {
 	name := p.readWord()
 
@@ -998,12 +1049,15 @@ func (p *parser) readRequestResponseType() (NamedDataType, error) {
 	}
 }
 
+// readDataType reads the next word from input and resolves it to a DataType.
 func (p *parser) readDataType() (DataType, error) {
 	name := p.readWord()
 	p.skipWhitespace()
 	return p.readDataTypeInternal(name)
 }
 
+// readDataTypeInternal resolves a type name string to a DataType. It handles
+// map types (with key/value parsing), scalar types, and named (message/enum) types.
 func (p *parser) readDataTypeInternal(name string) (DataType, error) {
 	// is it a map type?
 	if name == "map" {
@@ -1046,6 +1100,8 @@ const (
 	reservedRangeEnd   = 19999
 )
 
+// validateFieldTag checks that a field tag number is within the valid range (1 to 2^29-1)
+// and not in the reserved range (19000-19999) used internally by the protobuf implementation.
 func (p *parser) validateFieldTag(tag int) error {
 	if tag < 1 || tag > maxFieldNumber {
 		return p.errline("Field number %d is out of range. Must be between 1 and %d", tag, maxFieldNumber)
@@ -1056,24 +1112,32 @@ func (p *parser) validateFieldTag(tag int) error {
 	return nil
 }
 
+// unexpected returns a parse error indicating that the given label was not expected
+// in the current parse context.
 func (p *parser) unexpected(label string, ctx parseCtx) error {
 	return p.errline("Unexpected '%v' in context: %v", label, ctx)
 }
 
+// throw returns a parse error indicating that the expected character was not found,
+// reporting the actual character and current column position.
 func (p *parser) throw(expected rune, actual rune) error {
 	return p.errcol("Expected %v, but found: %v", strconv.QuoteRune(expected), strconv.QuoteRune(actual))
 }
 
+// errline returns a formatted error that includes the current line number.
 func (p *parser) errline(msg string, a ...interface{}) error {
 	s := fmt.Sprintf(msg, a...)
 	return fmt.Errorf(s+" on line: %v", p.loc.line)
 }
 
+// errcol returns a formatted error that includes both the current line and column numbers.
 func (p *parser) errcol(msg string, a ...interface{}) error {
 	s := fmt.Sprintf(msg, a...)
 	return fmt.Errorf(s+" on line: %v, column: %v", p.loc.line, p.loc.column)
 }
 
+// readName reads an identifier that may be enclosed in parentheses or brackets.
+// It returns the name, the type of enclosure used, and any error encountered.
 func (p *parser) readName() (string, enclosure, error) {
 	var name string
 	enc := unenclosed
