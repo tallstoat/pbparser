@@ -1014,3 +1014,35 @@ func TestReservedMax(t *testing.T) {
 		}
 	}
 }
+
+func TestStringEscapes(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/string_escape.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse string_escape.proto: %v", err)
+	}
+
+	// File-level option with escaped quotes
+	if len(pf.Options) != 1 {
+		t.Fatalf("Expected 1 file option, got %d", len(pf.Options))
+	}
+	expectedFileOpt := `hello \"world\"`
+	if pf.Options[0].Value != expectedFileOpt {
+		t.Errorf("Expected file option value %q, got %q", expectedFileOpt, pf.Options[0].Value)
+	}
+
+	// Field inline option with escaped quotes and backslash sequences
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+	msg := pf.Messages[0]
+	if len(msg.Fields) != 1 {
+		t.Fatalf("Expected 1 field, got %d", len(msg.Fields))
+	}
+	if len(msg.Fields[0].Options) != 1 {
+		t.Fatalf("Expected 1 field option, got %d", len(msg.Fields[0].Options))
+	}
+	expectedFieldOpt := `say \"hi\\n\"`
+	if msg.Fields[0].Options[0].Value != expectedFieldOpt {
+		t.Errorf("Expected field option value %q, got %q", expectedFieldOpt, msg.Fields[0].Options[0].Value)
+	}
+}

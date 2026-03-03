@@ -1345,6 +1345,16 @@ func (p *parser) readUntil(delimiter rune) string {
 			p.eofReached = true
 			break
 		}
+		if c == '\\' && delimiter == '"' {
+			_, _ = buf.WriteRune(c)
+			c2 := p.read()
+			if c2 == eof {
+				p.eofReached = true
+				break
+			}
+			_, _ = buf.WriteRune(c2)
+			continue
+		}
 		if c == delimiter {
 			break
 		}
