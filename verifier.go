@@ -370,6 +370,24 @@ func validateFieldDataTypes(mainpkg string, f fd, msgs []MessageElement, enums [
 	} else {
 		// Check any nested messages and nested enums in the same message which has the field
 		found = checkMsgOrEnumName(f.category, f.msg.Messages, f.msg.Enums)
+		// Walk up the scope chain to check sibling types in enclosing messages
+		if !found && f.msg.QualifiedName != "" {
+			orcl := m[mainpkg]
+			qn := f.msg.QualifiedName
+			for !found {
+				dotIdx := strings.LastIndexByte(qn, '.')
+				if dotIdx < 0 {
+					break
+				}
+				parent := qn[:dotIdx]
+				if parent == mainpkg {
+					break
+				}
+				candidate := parent + "." + f.category
+				found = orcl.msgmap[candidate] || orcl.enummap[candidate]
+				qn = parent
+			}
+		}
 		// If not a nested message or enum, then just check first class messages & enums in the package
 		if !found {
 			found = checkMsgOrEnumName(f.category, msgs, enums)

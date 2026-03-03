@@ -754,3 +754,33 @@ func TestDeepNestResolution(t *testing.T) {
 		t.Fatalf("Expected 2 RPCs, got %d", len(svc.RPCs))
 	}
 }
+
+// TestSiblingNestedMessageRef verifies that a nested message can reference
+// a sibling nested message within the same parent (issue #9).
+func TestSiblingNestedMessageRef(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/sibling_nested.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse sibling_nested.proto: %v", err)
+	}
+
+	if pf.PackageName != "XYZ" {
+		t.Errorf("Expected package 'XYZ', got %q", pf.PackageName)
+	}
+	if len(pf.Messages) != 2 {
+		t.Fatalf("Expected 2 top-level messages, got %d", len(pf.Messages))
+	}
+
+	result := pf.Messages[1]
+	if result.Name != "Result" {
+		t.Errorf("Expected message 'Result', got %q", result.Name)
+	}
+	if len(result.Messages) != 2 {
+		t.Fatalf("Expected 2 nested messages, got %d", len(result.Messages))
+	}
+	if result.Messages[0].Name != "Countries" {
+		t.Errorf("Expected nested message 'Countries', got %q", result.Messages[0].Name)
+	}
+	if result.Messages[1].Name != "City" {
+		t.Errorf("Expected nested message 'City', got %q", result.Messages[1].Name)
+	}
+}

@@ -1,0 +1,15 @@
+syntax = "proto3";
+package XYZ;
+
+service CityService {
+    rpc GetCitiesAndDistricts(Query) returns (Result) {}
+}
+
+message Query {}
+
+message Result {
+    message Countries {
+        repeated City cities = 2;
+    }
+    message City {}
+}
