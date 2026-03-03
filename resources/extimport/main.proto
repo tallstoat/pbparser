@@ -1,0 +1,9 @@
+syntax = "proto2";
+package myapp;
+
+import "extensions.proto";
+
+message MyMessage {
+  option (custom_ext.msg_opt) = "hello";
+  required string name = 1;
+}

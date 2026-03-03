@@ -851,3 +851,29 @@ func TestInlineComments(t *testing.T) {
 		t.Errorf("Expected no inline comment, got %q", msg.Fields[3].InlineComment)
 	}
 }
+
+// TestExtensionOnlyImport verifies that an import used solely through
+// parenthesized option names is not flagged as unused (PR #8 / issue).
+func TestExtensionOnlyImport(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/extimport/main.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse extimport/main.proto: %v", err)
+	}
+
+	if pf.PackageName != "myapp" {
+		t.Errorf("Expected package 'myapp', got %q", pf.PackageName)
+	}
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+	msg := pf.Messages[0]
+	if len(msg.Options) != 1 {
+		t.Fatalf("Expected 1 message option, got %d", len(msg.Options))
+	}
+	if !msg.Options[0].IsParenthesized {
+		t.Error("Expected option to be parenthesized")
+	}
+	if msg.Options[0].Name != "custom_ext.msg_opt" {
+		t.Errorf("Expected option name 'custom_ext.msg_opt', got %q", msg.Options[0].Name)
+	}
+}

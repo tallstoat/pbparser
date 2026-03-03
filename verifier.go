@@ -159,6 +159,11 @@ func areImportedPackagesUsed(pf *ProtoFile, packageNames []string) error {
 		// check if any fields in messages (nested or not) are referring to this imported package...
 		if checkImportedPackageUsage(pf.Messages, pkg, packageNames) {
 			inuse = true
+			goto LABEL
+		}
+		// check if any options (at any level) reference this imported package via parenthesized names...
+		if checkOptionPackageUsage(pf, pkg, packageNames) {
+			inuse = true
 		}
 	LABEL:
 		if !inuse {
@@ -189,6 +194,90 @@ func usesPackage(s string, pkg string, packageNames []string) bool {
 		inSamePkg, pkgName := isDatatypeInSamePackage(s, packageNames)
 		if !inSamePkg && pkg == pkgName {
 			return true
+		}
+	}
+	return false
+}
+
+func checkOptionPackageUsage(pf *ProtoFile, pkg string, packageNames []string) bool {
+	// file-level options
+	if optionsUsePackage(pf.Options, pkg, packageNames) {
+		return true
+	}
+	// service and rpc options
+	for _, svc := range pf.Services {
+		if optionsUsePackage(svc.Options, pkg, packageNames) {
+			return true
+		}
+		for _, rpc := range svc.RPCs {
+			if optionsUsePackage(rpc.Options, pkg, packageNames) {
+				return true
+			}
+		}
+	}
+	// message, field, enum, oneof options (recursively)
+	if messageOptionsUsePackage(pf.Messages, pkg, packageNames) {
+		return true
+	}
+	// top-level enum options
+	if enumOptionsUsePackage(pf.Enums, pkg, packageNames) {
+		return true
+	}
+	return false
+}
+
+func messageOptionsUsePackage(msgs []MessageElement, pkg string, packageNames []string) bool {
+	for _, msg := range msgs {
+		if optionsUsePackage(msg.Options, pkg, packageNames) {
+			return true
+		}
+		for _, f := range msg.Fields {
+			if optionsUsePackage(f.Options, pkg, packageNames) {
+				return true
+			}
+		}
+		for _, oo := range msg.OneOfs {
+			if optionsUsePackage(oo.Options, pkg, packageNames) {
+				return true
+			}
+			for _, f := range oo.Fields {
+				if optionsUsePackage(f.Options, pkg, packageNames) {
+					return true
+				}
+			}
+		}
+		if enumOptionsUsePackage(msg.Enums, pkg, packageNames) {
+			return true
+		}
+		if len(msg.Messages) > 0 {
+			if messageOptionsUsePackage(msg.Messages, pkg, packageNames) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func enumOptionsUsePackage(enums []EnumElement, pkg string, packageNames []string) bool {
+	for _, en := range enums {
+		if optionsUsePackage(en.Options, pkg, packageNames) {
+			return true
+		}
+		for _, ec := range en.EnumConstants {
+			if optionsUsePackage(ec.Options, pkg, packageNames) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func optionsUsePackage(opts []OptionElement, pkg string, packageNames []string) bool {
+	for _, opt := range opts {
+		if opt.IsParenthesized && strings.ContainsRune(opt.Name, '.') {
+			if usesPackage(opt.Name, pkg, packageNames) {
+				return true
+			}
 		}
 	}
 	return false

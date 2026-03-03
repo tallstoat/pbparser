@@ -1,0 +1,6 @@
+syntax = "proto2";
+package custom_ext;
+
+message Annotation {
+  optional string note = 1;
+}
