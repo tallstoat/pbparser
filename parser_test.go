@@ -3,6 +3,7 @@ package pbparser_test
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/tallstoat/pbparser"
@@ -78,7 +79,7 @@ func TestParseErrors(t *testing.T) {
 		{file: "wrong-field.proto", expectedErrors: []string{"Expected '=', but found: '!'"}},
 		{file: "wrong-option.proto", expectedErrors: []string{"Expected '=', but found: '!'"}},
 		{file: "wrong-option2.proto", expectedErrors: []string{"Expected ';'"}},
-		{file: "wrong-inline-option.proto", expectedErrors: []string{"Option", "is not specified as expected"}},
+		{file: "wrong-inline-option.proto", expectedErrors: []string{"Expected '='"}},
 		{file: "wrong-oneof.proto", expectedErrors: []string{"Expected '{'"}},
 		{file: "wrong-extend.proto", expectedErrors: []string{"Expected '{'"}},
 		{file: "wrong-service.proto", expectedErrors: []string{"Expected '{'"}},
@@ -92,6 +93,7 @@ func TestParseErrors(t *testing.T) {
 		{file: "extend-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'extend' in context: service"}},
 		{file: "oneof-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'oneof' in context: service"}},
 		{file: "unused-import.proto", expectedErrors: []string{"Imported package: dummy but not used"}},
+		{file: "unclosed-aggregate.proto", expectedErrors: []string{"Unterminated aggregate value"}},
 	}
 
 	for _, tt := range tests {
@@ -305,6 +307,111 @@ func TestOptionalInProto3(t *testing.T) {
 	// Second field has explicit optional label
 	if msg.Fields[1].Label != "optional" {
 		t.Errorf("Expected 'optional' label for field 'for', got %q", msg.Fields[1].Label)
+	}
+}
+
+// TestAggregateOptions verifies that aggregate (message literal) option values
+// are parsed correctly in various contexts: file-level, message-level, RPC-level,
+// and inline field options.
+func TestAggregateOptions(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/aggregate_option.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse aggregate_option.proto: %v", err)
+	}
+
+	// File-level options: one aggregate, one simple
+	if len(pf.Options) != 2 {
+		t.Fatalf("Expected 2 file-level options, got %d", len(pf.Options))
+	}
+
+	fileOpt := pf.Options[0]
+	if fileOpt.Name != "file_opt" || !fileOpt.IsParenthesized || !fileOpt.IsAggregateValue {
+		t.Errorf("File-level aggregate option: got name=%q parens=%v agg=%v",
+			fileOpt.Name, fileOpt.IsParenthesized, fileOpt.IsAggregateValue)
+	}
+	if !strings.Contains(fileOpt.Value, "name:") || !strings.Contains(fileOpt.Value, "value: 42") {
+		t.Errorf("File-level aggregate option value unexpected: %q", fileOpt.Value)
+	}
+
+	// Simple option still works (regression)
+	simpleOpt := pf.Options[1]
+	if simpleOpt.Name != "java_package" || simpleOpt.IsAggregateValue {
+		t.Errorf("Simple option: got name=%q agg=%v", simpleOpt.Name, simpleOpt.IsAggregateValue)
+	}
+	if simpleOpt.Value != "com.example.test" {
+		t.Errorf("Simple option value: got %q", simpleOpt.Value)
+	}
+
+	// Message-level aggregate option
+	if len(pf.Messages) < 1 {
+		t.Fatal("Expected at least 1 message")
+	}
+	req := pf.Messages[0]
+	if len(req.Options) != 1 {
+		t.Fatalf("Expected 1 message option, got %d", len(req.Options))
+	}
+	msgOpt := req.Options[0]
+	if !msgOpt.IsAggregateValue || msgOpt.Name != "msg_opt" {
+		t.Errorf("Message aggregate option: got name=%q agg=%v", msgOpt.Name, msgOpt.IsAggregateValue)
+	}
+
+	// Inline field options: aggregate and mixed
+	if len(req.Fields) < 3 {
+		t.Fatalf("Expected at least 3 fields, got %d", len(req.Fields))
+	}
+
+	// Field "value" has inline aggregate option
+	valField := req.Fields[1]
+	if len(valField.Options) != 1 {
+		t.Fatalf("Expected 1 option on field 'value', got %d", len(valField.Options))
+	}
+	if !valField.Options[0].IsAggregateValue || valField.Options[0].Name != "field_opt" {
+		t.Errorf("Field inline aggregate: got name=%q agg=%v",
+			valField.Options[0].Name, valField.Options[0].IsAggregateValue)
+	}
+
+	// Field "tag" has mixed: simple + aggregate
+	tagField := req.Fields[2]
+	if len(tagField.Options) != 2 {
+		t.Fatalf("Expected 2 options on field 'tag', got %d", len(tagField.Options))
+	}
+	if tagField.Options[0].IsAggregateValue || tagField.Options[0].Name != "deprecated" {
+		t.Errorf("Field simple option: got name=%q agg=%v",
+			tagField.Options[0].Name, tagField.Options[0].IsAggregateValue)
+	}
+	if !tagField.Options[1].IsAggregateValue || tagField.Options[1].Name != "custom" {
+		t.Errorf("Field inline aggregate: got name=%q agg=%v",
+			tagField.Options[1].Name, tagField.Options[1].IsAggregateValue)
+	}
+
+	// RPC-level aggregate option (gRPC HTTP annotation pattern)
+	if len(pf.Services) < 1 || len(pf.Services[0].RPCs) < 2 {
+		t.Fatal("Expected service with at least 2 RPCs")
+	}
+	getItem := pf.Services[0].RPCs[0]
+	if len(getItem.Options) != 1 {
+		t.Fatalf("Expected 1 option on RPC GetItem, got %d", len(getItem.Options))
+	}
+	httpOpt := getItem.Options[0]
+	if httpOpt.Name != "google.api.http" || !httpOpt.IsAggregateValue || !httpOpt.IsParenthesized {
+		t.Errorf("RPC HTTP option: got name=%q agg=%v parens=%v",
+			httpOpt.Name, httpOpt.IsAggregateValue, httpOpt.IsParenthesized)
+	}
+	if !strings.Contains(httpOpt.Value, "/v1/items/{name=items/*}") {
+		t.Errorf("RPC HTTP option value should contain path, got: %q", httpOpt.Value)
+	}
+
+	// RPC with nested aggregate
+	updateItem := pf.Services[0].RPCs[1]
+	if len(updateItem.Options) != 1 {
+		t.Fatalf("Expected 1 option on RPC UpdateItem, got %d", len(updateItem.Options))
+	}
+	nestedOpt := updateItem.Options[0]
+	if !nestedOpt.IsAggregateValue {
+		t.Error("Expected nested aggregate option to have IsAggregateValue=true")
+	}
+	if !strings.Contains(nestedOpt.Value, "{inner: 1}") {
+		t.Errorf("Nested aggregate should contain nested braces, got: %q", nestedOpt.Value)
 	}
 }
 

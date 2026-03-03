@@ -457,17 +457,48 @@ func (p *parser) readListOptionsOnALine() ([]OptionElement, error) {
 
 func (p *parser) readListOptions() ([]OptionElement, error) {
 	var options []OptionElement
-	optionsStr := p.readUntil(']')
-	pairs := strings.Split(optionsStr, ",")
-	for _, pair := range pairs {
-		arr := strings.Split(pair, "=")
-		if len(arr) != 2 {
-			return nil, p.errline("Option '%v' is not specified as expected", arr)
+	for {
+		p.skipWhitespace()
+
+		// read option name
+		name, enc, err := p.readName()
+		if err != nil {
+			return nil, err
 		}
-		oname, hasParenthesis := stripParenthesis(strings.TrimSpace(arr[0]))
-		oval := stripQuotes(strings.TrimSpace(arr[1]))
-		oe := OptionElement{Name: oname, Value: oval, IsParenthesized: hasParenthesis}
+
+		p.skipWhitespace()
+		if c := p.read(); c != '=' {
+			return nil, p.throw('=', c)
+		}
+		p.skipWhitespace()
+
+		// read option value
+		oe := OptionElement{Name: name, IsParenthesized: (enc == parenthesis)}
+		c := p.read()
+		if c == '"' {
+			oe.Value = p.readUntil('"')
+		} else if c == '{' {
+			val, err := p.readAggregateValue()
+			if err != nil {
+				return nil, err
+			}
+			oe.Value = val
+			oe.IsAggregateValue = true
+		} else {
+			p.unread()
+			oe.Value = p.readWord()
+		}
+
 		options = append(options, oe)
+
+		// check for delimiter: ']' ends the list, ',' continues
+		p.skipWhitespace()
+		c = p.read()
+		if c == ']' {
+			break
+		} else if c != ',' {
+			return nil, p.throw(',', c)
+		}
 	}
 	return options, nil
 }
@@ -489,8 +520,16 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 	}
 	p.skipWhitespace()
 
-	if p.read() == '"' {
+	c := p.read()
+	if c == '"' {
 		oe.Value = p.readUntil('"')
+	} else if c == '{' {
+		val, err := p.readAggregateValue()
+		if err != nil {
+			return err
+		}
+		oe.Value = val
+		oe.IsAggregateValue = true
 	} else {
 		p.unread()
 		oe.Value = p.readWord()
@@ -521,6 +560,44 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 		pf.Options = append(pf.Options, oe)
 	}
 	return nil
+}
+
+// readAggregateValue reads a brace-delimited aggregate option value.
+// The opening '{' has already been consumed by the caller. It reads until
+// the matching '}', handling nested braces and quoted strings.
+func (p *parser) readAggregateValue() (string, error) {
+	var buf bytes.Buffer
+	depth := 1
+	inQuote := false
+	for {
+		c := p.read()
+		if c == eof {
+			return "", p.errline("Unterminated aggregate value (missing '}')")
+		}
+		if inQuote {
+			_, _ = buf.WriteRune(c)
+			if c == '"' {
+				inQuote = false
+			}
+			continue
+		}
+		if c == '"' {
+			inQuote = true
+			_, _ = buf.WriteRune(c)
+		} else if c == '{' {
+			depth++
+			_, _ = buf.WriteRune(c)
+		} else if c == '}' {
+			depth--
+			if depth == 0 {
+				break
+			}
+			_, _ = buf.WriteRune(c)
+		} else {
+			_, _ = buf.WriteRune(c)
+		}
+	}
+	return strings.TrimSpace(buf.String()), nil
 }
 
 func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) error {
@@ -966,14 +1043,12 @@ func (p *parser) readName() (string, enclosure, error) {
 		if p.read() != ')' {
 			return "", enc, p.errline("Expected ')'")
 		}
-		p.unread()
 	} else if c == '[' {
 		enc = bracket
 		name = p.readWord()
 		if p.read() != ']' {
 			return "", enc, p.errline("Expected ']'")
 		}
-		p.unread()
 	} else {
 		p.unread()
 		name = p.readWord()

@@ -1,0 +1,6 @@
+syntax = "proto3";
+package broken;
+
+option (bad_opt) = {
+  name: "test"
+  value: 42

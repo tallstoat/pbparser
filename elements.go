@@ -11,10 +11,11 @@ type SourceLocation struct {
 // the option construct in a protobuf file. Option constructs
 // exist at various levels/contexts like file, message etc.
 type OptionElement struct {
-	Location        SourceLocation
-	Name            string
-	Value           string
-	IsParenthesized bool
+	Location         SourceLocation
+	Name             string
+	Value            string
+	IsParenthesized  bool
+	IsAggregateValue bool
 }
 
 // EnumConstantElement is a datastructure which models

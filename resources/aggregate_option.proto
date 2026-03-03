@@ -1,0 +1,42 @@
+syntax = "proto3";
+package aggtest;
+
+// File-level aggregate option
+option (file_opt) = {
+  name: "test"
+  value: 42
+};
+
+// Simple option for regression
+option java_package = "com.example.test";
+
+message Request {
+  // Message-level aggregate option
+  option (msg_opt) = { deprecated: true reason: "use v2" };
+  string name = 1;
+  // Field with inline aggregate option
+  string value = 2 [(field_opt)={priority: "high"}];
+  // Field with mixed inline options
+  string tag = 3 [deprecated=true, (custom)={x: 1}];
+}
+
+message Response {
+  string result = 1;
+}
+
+service TestService {
+  // RPC with aggregate option (gRPC HTTP annotation pattern)
+  rpc GetItem (Request) returns (Response) {
+    option (google.api.http) = {
+      get: "/v1/items/{name=items/*}"
+      body: "*"
+    };
+  }
+  // RPC with nested aggregate
+  rpc UpdateItem (Request) returns (Response) {
+    option (nested_opt) = {
+      outer: {inner: 1}
+      label: "test"
+    };
+  }
+}
