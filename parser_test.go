@@ -803,3 +803,51 @@ func TestMultiLineCommentWithStars(t *testing.T) {
 		t.Errorf("Expected message 'Foo', got %q", pf.Messages[0].Name)
 	}
 }
+
+// TestInlineComments verifies that inline comments on field and enum constant
+// lines are captured in the InlineComment field (issue #17).
+func TestInlineComments(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/inline_comment.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse inline_comment.proto: %v", err)
+	}
+
+	// Check enum constant inline comments
+	if len(pf.Enums) != 1 {
+		t.Fatalf("Expected 1 enum, got %d", len(pf.Enums))
+	}
+	en := pf.Enums[0]
+	if len(en.EnumConstants) != 3 {
+		t.Fatalf("Expected 3 enum constants, got %d", len(en.EnumConstants))
+	}
+	if en.EnumConstants[0].InlineComment != "default value" {
+		t.Errorf("Expected inline comment 'default value', got %q", en.EnumConstants[0].InlineComment)
+	}
+	if en.EnumConstants[1].InlineComment != "entity is active" {
+		t.Errorf("Expected inline comment 'entity is active', got %q", en.EnumConstants[1].InlineComment)
+	}
+	if en.EnumConstants[2].InlineComment != "" {
+		t.Errorf("Expected no inline comment, got %q", en.EnumConstants[2].InlineComment)
+	}
+
+	// Check field inline comments
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+	msg := pf.Messages[0]
+	if len(msg.Fields) != 4 {
+		t.Fatalf("Expected 4 fields, got %d", len(msg.Fields))
+	}
+	if msg.Fields[0].InlineComment != "ISO 4217 currency code" {
+		t.Errorf("Expected inline comment 'ISO 4217 currency code', got %q", msg.Fields[0].InlineComment)
+	}
+	if msg.Fields[1].InlineComment != "amount in minor units" {
+		t.Errorf("Expected inline comment 'amount in minor units', got %q", msg.Fields[1].InlineComment)
+	}
+	if msg.Fields[2].InlineComment != "a block comment" {
+		t.Errorf("Expected inline comment 'a block comment', got %q", msg.Fields[2].InlineComment)
+	}
+	if msg.Fields[3].InlineComment != "" {
+		t.Errorf("Expected no inline comment, got %q", msg.Fields[3].InlineComment)
+	}
+}

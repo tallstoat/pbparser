@@ -430,7 +430,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	}
 
 	// If semicolon is next; we are done. If '[' is next, we must parse options for the field
-	if fe.Options, err = p.readListOptionsOnALine(); err != nil {
+	if fe.Options, fe.InlineComment, err = p.readListOptionsOnALine(); err != nil {
 		return err
 	}
 
@@ -491,25 +491,26 @@ func (p *parser) readGroup(pf *ProtoFile, label string, documentation string, ct
 
 // readListOptionsOnALine reads list options provided on a line.
 // generally relevant for fields and enum constant declarations.
-func (p *parser) readListOptionsOnALine() ([]OptionElement, error) {
+// It also captures any inline comment appearing after the semicolon.
+func (p *parser) readListOptionsOnALine() ([]OptionElement, string, error) {
 	var err error
 	var options []OptionElement
 	p.skipWhitespace()
 	c := p.read()
 	if c == '[' {
 		if options, err = p.readListOptions(); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		c2 := p.read()
 		if c2 != ';' {
-			return nil, p.throw(';', c2)
+			return nil, "", p.throw(';', c2)
 		}
 	} else if c != ';' {
-		return nil, p.throw(';', c)
+		return nil, "", p.throw(';', c)
 	}
-	// Gobble up any inline documentation for a field
-	p.skipUntilNewline()
-	return options, nil
+	// Capture any inline comment after the semicolon
+	inlineComment := p.readInlineComment()
+	return options, inlineComment, nil
 }
 
 func (p *parser) readListOptions() ([]OptionElement, error) {
@@ -752,7 +753,7 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 	}
 
 	// If semicolon is next; we are done. If '[' is next, we must parse options for the enum constant
-	if ec.Options, err = p.readListOptionsOnALine(); err != nil {
+	if ec.Options, ec.InlineComment, err = p.readListOptionsOnALine(); err != nil {
 		return err
 	}
 
@@ -1252,6 +1253,43 @@ func (p *parser) skipUntilNewline() {
 			return
 		}
 	}
+}
+
+// readInlineComment reads any inline comment (// or /* */) after a
+// semicolon on the same line. Returns the comment text (trimmed) or
+// empty string if no comment is present.
+func (p *parser) readInlineComment() string {
+	// skip horizontal whitespace (spaces/tabs) but stop at newline
+	for {
+		c := p.read()
+		if c == '\n' || c == eof {
+			if c == eof {
+				p.eofReached = true
+			}
+			return ""
+		}
+		if c != ' ' && c != '\t' {
+			p.unread()
+			break
+		}
+	}
+	// check for comment start
+	c := p.read()
+	if c != '/' {
+		// not a comment; skip rest of line
+		p.unread()
+		p.skipUntilNewline()
+		return ""
+	}
+	c2 := p.read()
+	if c2 == '/' {
+		return strings.TrimSpace(p.readUntilNewline())
+	} else if c2 == '*' {
+		return p.readMultiLineComment()
+	}
+	// not a comment; skip rest of line
+	p.skipUntilNewline()
+	return ""
 }
 
 func (p *parser) unread() {

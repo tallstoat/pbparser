@@ -1,0 +1,15 @@
+syntax = "proto3";
+package inlinetest;
+
+enum Status {
+  UNKNOWN = 0; // default value
+  ACTIVE = 1; // entity is active
+  INACTIVE = 2;
+}
+
+message MoneyValue {
+  string currency = 1; // ISO 4217 currency code
+  int64 amount = 2; // amount in minor units
+  string description = 3; /* a block comment */
+  string note = 4;
+}

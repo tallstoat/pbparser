@@ -25,6 +25,7 @@ type EnumConstantElement struct {
 	Location      SourceLocation
 	Name          string
 	Documentation string
+	InlineComment string
 	Options       []OptionElement
 	Tag           int
 }
@@ -72,6 +73,7 @@ type FieldElement struct {
 	Location      SourceLocation
 	Name          string
 	Documentation string
+	InlineComment string
 	Options       []OptionElement
 	Label         string /* optional, required, repeated, oneof */
 	Type          DataType
