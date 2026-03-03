@@ -123,6 +123,13 @@ func verify(pf *ProtoFile, p ImportModuleProvider) error {
 		}
 	}
 
+	// validate that map fields are not used inside oneofs
+	for _, msg := range pf.Messages {
+		if err := validateNoMapInOneOf(msg); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -672,6 +679,22 @@ func validateEnumFirstValueZeroInMessage(msg MessageElement) error {
 	}
 	for _, nestedmsg := range msg.Messages {
 		if err := validateEnumFirstValueZeroInMessage(nestedmsg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateNoMapInOneOf(msg MessageElement) error {
+	for _, oo := range msg.OneOfs {
+		for _, f := range oo.Fields {
+			if f.Type.Category() == MapDataTypeCategory {
+				return fmt.Errorf("Map fields are not allowed in oneofs (field '%v' in oneof '%v' of message '%v')", f.Name, oo.Name, msg.QualifiedName)
+			}
+		}
+	}
+	for _, nestedmsg := range msg.Messages {
+		if err := validateNoMapInOneOf(nestedmsg); err != nil {
 			return err
 		}
 	}
