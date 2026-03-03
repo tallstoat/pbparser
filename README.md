@@ -1,5 +1,5 @@
 [![GoReportCard](https://goreportcard.com/badge/github.com/tallstoat/pbparser)](https://goreportcard.com/report/github.com/tallstoat/pbparser)
-[![GoDoc](https://godoc.org/github.com/tallstoat/pbparser?status.svg)](https://godoc.org/github.com/tallstoat/pbparser)
+[![Go Reference](https://pkg.go.dev/badge/github.com/tallstoat/pbparser.svg)](https://pkg.go.dev/github.com/tallstoat/pbparser)
 
 # pbparser
 
@@ -54,7 +54,7 @@ On the other hand, Clients should use the ParseFile() function if all the import
 
 ## Usage
 
-Please refer to the [examples](https://godoc.org/github.com/tallstoat/pbparser#pkg-examples) for API usage.
+Please refer to the [examples](https://pkg.go.dev/github.com/tallstoat/pbparser#pkg-examples) for API usage.
 
 ## Supported Features
 
