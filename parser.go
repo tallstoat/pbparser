@@ -349,11 +349,7 @@ func (p *parser) readReservedNames(documentation string, me *MessageElement) err
 }
 
 func (p *parser) readField(pf *ProtoFile, label string, documentation string, ctx parseCtx) error {
-	if label == optional && pf.Syntax == proto3 {
-		return p.errline("Explicit 'optional' labels are disallowed in the proto3 syntax. " +
-			"To define 'optional' fields in proto3, simply remove the 'optional' label, as fields " +
-			"are 'optional' by default.")
-	} else if label == required && pf.Syntax == proto3 {
+	if label == required && pf.Syntax == proto3 {
 		return p.errline("Required fields are not allowed in proto3")
 	} else if label == required && ctx.ctxType == extendCtx {
 		return p.errline("Message extensions cannot have required fields")

@@ -53,7 +53,6 @@ func TestParseErrors(t *testing.T) {
 		{file: "wrong-syntax.proto", expectedErrors: []string{"'syntax' must be 'proto2' or 'proto3'"}},
 		{file: "wrong-syntax2.proto", expectedErrors: []string{"Expected ';'"}},
 		{file: "wrong-syntax3.proto", expectedErrors: []string{"Expected '='"}},
-		{file: "optional-in-proto3.proto", expectedErrors: []string{"Explicit 'optional' labels are disallowed in the proto3 syntax"}},
 		{file: "required-in-proto3.proto", expectedErrors: []string{"Required fields are not allowed in proto3"}},
 		{file: "rpc-in-wrong-context.proto", expectedErrors: []string{"Unexpected 'rpc' in context"}},
 		{file: "dup-enum.proto", expectedErrors: []string{"Duplicate name"}},
@@ -280,6 +279,34 @@ var (
 	tab  = indent(2)
 	tab2 = indent(4)
 )
+
+// TestOptionalInProto3 verifies that the 'optional' label is allowed in proto3
+// (explicit field presence, supported since protobuf v3.15).
+func TestOptionalInProto3(t *testing.T) {
+	pf, err := pbparser.ParseFile(errResourceDir + "optional-in-proto3.proto")
+	if err != nil {
+		t.Fatalf("Expected optional in proto3 to parse successfully, got error: %v", err)
+	}
+
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+
+	msg := pf.Messages[0]
+	if len(msg.Fields) != 2 {
+		t.Fatalf("Expected 2 fields, got %d", len(msg.Fields))
+	}
+
+	// First field has no label (default in proto3)
+	if msg.Fields[0].Label != "" {
+		t.Errorf("Expected empty label for field 'status', got %q", msg.Fields[0].Label)
+	}
+
+	// Second field has explicit optional label
+	if msg.Fields[1].Label != "optional" {
+		t.Errorf("Expected 'optional' label for field 'for', got %q", msg.Fields[1].Label)
+	}
+}
 
 // TestSourceLocations verifies that parsed elements carry correct source location
 // information (line and column) corresponding to their position in the .proto file.
