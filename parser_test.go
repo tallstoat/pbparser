@@ -1046,3 +1046,36 @@ func TestStringEscapes(t *testing.T) {
 		t.Errorf("Expected field option value %q, got %q", expectedFieldOpt, msg.Fields[0].Options[0].Value)
 	}
 }
+
+func TestHexOctalFieldTags(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/hex_octal_tags.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse hex_octal_tags.proto: %v", err)
+	}
+
+	if len(pf.Messages) != 1 {
+		t.Fatalf("Expected 1 message, got %d", len(pf.Messages))
+	}
+	msg := pf.Messages[0]
+	if len(msg.Fields) != 4 {
+		t.Fatalf("Expected 4 fields, got %d", len(msg.Fields))
+	}
+
+	expected := []struct {
+		name string
+		tag  int
+	}{
+		{"decimal_field", 10},
+		{"hex_field", 20},       // 0x14 = 20
+		{"octal_field", 30},     // 036 = 30
+		{"hex_upper", 30},       // 0X1E = 30
+	}
+	for i, f := range msg.Fields {
+		if f.Name != expected[i].name {
+			t.Errorf("Field %d: expected name %q, got %q", i, expected[i].name, f.Name)
+		}
+		if f.Tag != expected[i].tag {
+			t.Errorf("Field %q: expected tag %d, got %d", expected[i].name, expected[i].tag, f.Tag)
+		}
+	}
+}

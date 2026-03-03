@@ -289,7 +289,7 @@ func (p *parser) readReserved(pf *ProtoFile, documentation string, ctx parseCtx)
 
 func (p *parser) readReservedRanges(documentation string, me *MessageElement) error {
 	for {
-		start, err := p.readInt()
+		start, err := p.readIntLiteral()
 		if err != nil {
 			return err
 		}
@@ -436,7 +436,7 @@ func (p *parser) readSignedInt() (int, error) {
 	} else {
 		p.unread()
 	}
-	val, err := p.readInt()
+	val, err := p.readIntLiteral()
 	if err != nil {
 		return 0, err
 	}
@@ -518,7 +518,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 
 	// extract the field tag...
 	p.skipWhitespace()
-	if fe.Tag, err = p.readInt(); err != nil {
+	if fe.Tag, err = p.readIntLiteral(); err != nil {
 		return err
 	}
 	if err = p.validateFieldTag(fe.Tag); err != nil {
@@ -559,7 +559,7 @@ func (p *parser) readGroup(pf *ProtoFile, label string, documentation string, ct
 		return p.throw('=', c)
 	}
 	p.skipWhitespace()
-	if ge.Tag, err = p.readInt(); err != nil {
+	if ge.Tag, err = p.readIntLiteral(); err != nil {
 		return err
 	}
 	if err = p.validateFieldTag(ge.Tag); err != nil {
@@ -803,7 +803,7 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 	}
 
 	p.skipWhitespace()
-	start, err := p.readInt()
+	start, err := p.readIntLiteral()
 	if err != nil {
 		return err
 	}
@@ -1274,10 +1274,39 @@ func (p *parser) readWordAdvanced(f func(r rune) bool) string {
 	return buf.String()
 }
 
-func (p *parser) readInt() (int, error) {
+func (p *parser) readIntLiteral() (int, error) {
 	var buf bytes.Buffer
+	c := p.read()
+	if !isDigit(c) {
+		p.unread()
+		return 0, fmt.Errorf("expected digit, found %v", strconv.QuoteRune(c))
+	}
+	_, _ = buf.WriteRune(c)
+
+	// Check for hex (0x/0X) or octal (0-prefixed) literals
+	if c == '0' {
+		c2 := p.read()
+		if c2 == 'x' || c2 == 'X' {
+			_, _ = buf.WriteRune(c2)
+			for {
+				c3 := p.read()
+				if isHexDigit(c3) {
+					_, _ = buf.WriteRune(c3)
+				} else {
+					p.unread()
+					break
+				}
+			}
+			str := buf.String()
+			intVal, err := strconv.ParseInt(str, 0, 64)
+			return int(intVal), err
+		}
+		p.unread()
+	}
+
+	// Decimal or octal (leading 0) digits
 	for {
-		c := p.read()
+		c = p.read()
 		if isDigit(c) {
 			_, _ = buf.WriteRune(c)
 		} else {
@@ -1286,8 +1315,8 @@ func (p *parser) readInt() (int, error) {
 		}
 	}
 	str := buf.String()
-	intVal, err := strconv.Atoi(str)
-	return intVal, err
+	intVal, err := strconv.ParseInt(str, 0, 64)
+	return int(intVal), err
 }
 
 func (p *parser) readDocumentation() (string, error) {
@@ -1492,6 +1521,10 @@ func isLetter(c rune) bool {
 
 func isDigit(c rune) bool {
 	return (c >= '0' && c <= '9')
+}
+
+func isHexDigit(c rune) bool {
+	return isDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
 }
 
 // End of the file...

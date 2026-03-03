@@ -1,0 +1,9 @@
+syntax = "proto3";
+package hexoctalpkg;
+
+message Foo {
+  int32 decimal_field = 10;
+  string hex_field = 0x14;
+  bool octal_field = 036;
+  int64 hex_upper = 0X1E;
+}
