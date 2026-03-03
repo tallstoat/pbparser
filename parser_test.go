@@ -280,3 +280,124 @@ var (
 	tab  = indent(2)
 	tab2 = indent(4)
 )
+
+// TestSourceLocations verifies that parsed elements carry correct source location
+// information (line and column) corresponding to their position in the .proto file.
+func TestSourceLocations(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/service.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse service.proto: %v", err)
+	}
+
+	assertLoc := func(desc string, loc pbparser.SourceLocation, expectedLine int) {
+		t.Helper()
+		if loc.Line != expectedLine {
+			t.Errorf("%s: expected line %d, got line %d", desc, expectedLine, loc.Line)
+		}
+		if loc.Column == 0 {
+			t.Errorf("%s: expected non-zero column, got 0", desc)
+		}
+	}
+
+	// File-level option
+	if len(pf.Options) < 1 {
+		t.Fatal("Expected at least 1 file-level option")
+	}
+	assertLoc("Option java_package", pf.Options[0].Location, 7)
+
+	// Service
+	if len(pf.Services) < 1 {
+		t.Fatal("Expected at least 1 service")
+	}
+	svc := pf.Services[0]
+	assertLoc("Service LogTask", svc.Location, 13)
+
+	// Service option
+	if len(svc.Options) < 1 {
+		t.Fatal("Expected at least 1 service option")
+	}
+	assertLoc("Service Option foosh", svc.Options[0].Location, 15)
+
+	// RPCs
+	if len(svc.RPCs) < 2 {
+		t.Fatal("Expected at least 2 RPCs")
+	}
+	assertLoc("RPC AddTask", svc.RPCs[0].Location, 17)
+	assertLoc("RPC ListTasks", svc.RPCs[1].Location, 18)
+
+	// Messages
+	if len(pf.Messages) < 8 {
+		t.Fatalf("Expected at least 8 messages, got %d", len(pf.Messages))
+	}
+
+	// TaskId message (line 29) with nested enum Corpus (line 32)
+	taskId := pf.Messages[0]
+	assertLoc("Message TaskId", taskId.Location, 29)
+	if len(taskId.Enums) < 1 {
+		t.Fatal("Expected enum in TaskId")
+	}
+	assertLoc("Enum Corpus", taskId.Enums[0].Location, 32)
+
+	// Enum constants
+	corpus := taskId.Enums[0]
+	if len(corpus.EnumConstants) < 1 {
+		t.Fatal("Expected enum constants in Corpus")
+	}
+	assertLoc("EnumConstant UNIVERSAL", corpus.EnumConstants[0].Location, 33)
+
+	// Task message (line 45) with fields and oneof
+	task := pf.Messages[1]
+	assertLoc("Message Task", task.Location, 45)
+	if len(task.Fields) < 1 {
+		t.Fatal("Expected fields in Task")
+	}
+	assertLoc("Field name", task.Fields[0].Location, 46)
+
+	// OneOf
+	if len(task.OneOfs) < 1 {
+		t.Fatal("Expected oneof in Task")
+	}
+	assertLoc("OneOf fizzbuzz", task.OneOfs[0].Location, 58)
+
+	// TaskListOptions with extensions range (line 81)
+	taskListOpts := pf.Messages[3]
+	if len(taskListOpts.Extensions) < 1 {
+		t.Fatal("Expected extensions in TaskListOptions")
+	}
+	assertLoc("Extensions range", taskListOpts.Extensions[0].Location, 81)
+
+	// TaskUpdateOptions with reserved ranges (line 88)
+	taskUpdateOpts := pf.Messages[4]
+	if len(taskUpdateOpts.ReservedRanges) < 1 {
+		t.Fatal("Expected reserved ranges in TaskUpdateOptions")
+	}
+	assertLoc("Reserved range", taskUpdateOpts.ReservedRanges[0].Location, 88)
+
+	// Top-level extend (line 65)
+	if len(pf.ExtendDeclarations) < 1 {
+		t.Fatal("Expected at least 1 extend declaration")
+	}
+	assertLoc("Extend Task", pf.ExtendDeclarations[0].Location, 65)
+
+	// Nested extend inside TaskList (line 72)
+	taskList := pf.Messages[2]
+	if len(taskList.ExtendDeclarations) < 1 {
+		t.Fatal("Expected extend in TaskList")
+	}
+	assertLoc("Nested Extend Task", taskList.ExtendDeclarations[0].Location, 72)
+
+	// Top-level enum (line 114)
+	if len(pf.Enums) < 1 {
+		t.Fatal("Expected at least 1 top-level enum")
+	}
+	assertLoc("Enum EnumAllowingAlias", pf.Enums[0].Location, 114)
+
+	// Nested messages in Outer (line 120)
+	outer := pf.Messages[7]
+	assertLoc("Message Outer", outer.Location, 120)
+	if len(outer.Messages) < 2 {
+		t.Fatal("Expected nested messages in Outer")
+	}
+	assertLoc("Nested MiddleAA", outer.Messages[0].Location, 121)
+	assertLoc("Nested MiddleBB", outer.Messages[1].Location, 127)
+}

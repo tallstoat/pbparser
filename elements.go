@@ -1,9 +1,17 @@
 package pbparser
 
+// SourceLocation represents the position in the source .proto file
+// where a particular element is declared.
+type SourceLocation struct {
+	Line   int
+	Column int
+}
+
 // OptionElement is a datastructure which models
 // the option construct in a protobuf file. Option constructs
 // exist at various levels/contexts like file, message etc.
 type OptionElement struct {
+	Location        SourceLocation
 	Name            string
 	Value           string
 	IsParenthesized bool
@@ -13,6 +21,7 @@ type OptionElement struct {
 // the fields within an enum construct. Enum constants can
 // also have inline options specified.
 type EnumConstantElement struct {
+	Location      SourceLocation
 	Name          string
 	Documentation string
 	Options       []OptionElement
@@ -23,6 +32,7 @@ type EnumConstantElement struct {
 // the enum construct in a protobuf file. Enums are
 // defined standalone or as nested entities within messages.
 type EnumElement struct {
+	Location      SourceLocation
 	Name          string
 	QualifiedName string
 	Documentation string
@@ -34,6 +44,7 @@ type EnumElement struct {
 // the rpc construct in a protobuf file. RPCs are defined
 // nested within ServiceElements.
 type RPCElement struct {
+	Location      SourceLocation
 	Name          string
 	Documentation string
 	Options       []OptionElement
@@ -45,6 +56,7 @@ type RPCElement struct {
 // the service construct in a protobuf file. Service
 // construct defines the rpcs (apis) for the service.
 type ServiceElement struct {
+	Location      SourceLocation
 	Name          string
 	QualifiedName string
 	Documentation string
@@ -56,6 +68,7 @@ type ServiceElement struct {
 // a field of a message, a field of a oneof element
 // or an entry in the extend declaration in a protobuf file.
 type FieldElement struct {
+	Location      SourceLocation
 	Name          string
 	Documentation string
 	Options       []OptionElement
@@ -69,6 +82,7 @@ type FieldElement struct {
 // oneof construct share memory, and at most one field can be
 // set at any time.
 type OneOfElement struct {
+	Location      SourceLocation
 	Name          string
 	Documentation string
 	Options       []OptionElement
@@ -82,6 +96,7 @@ type OneOfElement struct {
 // to the original message definition by defining field ranges which
 // can be used for extensions.
 type ExtensionsElement struct {
+	Location      SourceLocation
 	Documentation string
 	Start         int
 	End           int
@@ -90,6 +105,7 @@ type ExtensionsElement struct {
 // ReservedRangeElement is a datastructure which models
 // a reserved construct in a protobuf message.
 type ReservedRangeElement struct {
+	Location      SourceLocation
 	Documentation string
 	Start         int
 	End           int
@@ -98,6 +114,7 @@ type ReservedRangeElement struct {
 // MessageElement is a datastructure which models
 // the message construct in a protobuf file.
 type MessageElement struct {
+	Location           SourceLocation
 	Name               string
 	QualifiedName      string
 	Documentation      string
@@ -116,6 +133,7 @@ type MessageElement struct {
 // the extend construct in a protobuf file which is used
 // to add new fields to a previously declared message type.
 type ExtendElement struct {
+	Location      SourceLocation
 	Name          string
 	QualifiedName string
 	Documentation string

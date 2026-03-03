@@ -93,6 +93,11 @@ type parser struct {
 	eofReached     bool   // We set this flag, when eof is encountered
 	prefix         string // The current package name + nested type names, separated by dots
 	lastColumnRead int
+	declLoc        SourceLocation // location captured at start of current declaration
+}
+
+func (p *parser) currentLoc() SourceLocation {
+	return SourceLocation{Line: p.loc.line, Column: p.loc.column}
 }
 
 // This function just looks for documentation and
@@ -156,6 +161,9 @@ func (p *parser) readDeclaration(pf *ProtoFile, documentation string, ctx parseC
 		return nil
 	}
 	p.unread()
+
+	// Capture location at start of declaration (before the keyword)...
+	p.declLoc = p.currentLoc()
 
 	// Read next label...
 	label := p.readWord()
@@ -280,7 +288,7 @@ func (p *parser) readReservedRanges(documentation string, me *MessageElement) er
 			return err
 		}
 
-		rr := ReservedRangeElement{Start: start, End: start, Documentation: documentation}
+		rr := ReservedRangeElement{Location: p.declLoc, Start: start, End: start, Documentation: documentation}
 
 		// check if we are done providing the reserved names
 		c := p.read()
@@ -352,7 +360,7 @@ func (p *parser) readField(pf *ProtoFile, label string, documentation string, ct
 	}
 
 	// the field struct...
-	fe := FieldElement{Documentation: documentation}
+	fe := FieldElement{Location: p.declLoc, Documentation: documentation}
 
 	// figure out dataTypeStr based on the label...
 	var err error
@@ -471,7 +479,7 @@ func (p *parser) readListOptions() ([]OptionElement, error) {
 func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) error {
 	var err error
 	var enc enclosure
-	oe := OptionElement{}
+	oe := OptionElement{Location: p.declLoc}
 
 	p.skipWhitespace()
 	if oe.Name, enc, err = p.readName(); err != nil {
@@ -526,7 +534,7 @@ func (p *parser) readMessage(pf *ProtoFile, documentation string, ctx parseCtx) 
 		return err
 	}
 
-	me := MessageElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
+	me := MessageElement{Location: p.declLoc, Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
 
 	// store previous prefix...
 	var previousPrefix = p.prefix
@@ -571,7 +579,7 @@ func (p *parser) readExtensions(pf *ProtoFile, documentation string, ctx parseCt
 	}
 
 	// At this point, make End be same as Start...
-	xe := ExtensionsElement{Documentation: documentation, Start: start, End: start}
+	xe := ExtensionsElement{Location: p.declLoc, Documentation: documentation, Start: start, End: start}
 
 	c := p.read()
 	if c != ';' {
@@ -607,7 +615,7 @@ func (p *parser) readEnumConstant(pf *ProtoFile, label string, documentation str
 	p.skipWhitespace()
 
 	var err error
-	ec := EnumConstantElement{Name: label, Documentation: documentation}
+	ec := EnumConstantElement{Location: p.declLoc, Name: label, Documentation: documentation}
 
 	if ec.Tag, err = p.readInt(); err != nil {
 		return p.errline("Unable to read tag for Enum Constant: %v due to: %v", label, err.Error())
@@ -630,7 +638,7 @@ func (p *parser) readOneOf(pf *ProtoFile, documentation string, ctx parseCtx) er
 		return err
 	}
 
-	oe := OneOfElement{Name: name, Documentation: documentation}
+	oe := OneOfElement{Location: p.declLoc, Name: name, Documentation: documentation}
 
 	p.skipWhitespace()
 	if c := p.read(); c != '{' {
@@ -657,7 +665,7 @@ func (p *parser) readExtend(pf *ProtoFile, documentation string, ctx parseCtx) e
 	if !strings.Contains(name, ".") && p.prefix != "" {
 		qualifiedName = p.prefix + name
 	}
-	ee := ExtendElement{Name: name, QualifiedName: qualifiedName, Documentation: documentation}
+	ee := ExtendElement{Location: p.declLoc, Name: name, QualifiedName: qualifiedName, Documentation: documentation}
 
 	p.skipWhitespace()
 	if c := p.read(); c != '{' {
@@ -691,7 +699,7 @@ func (p *parser) readRPC(pf *ProtoFile, se *ServiceElement, documentation string
 	}
 
 	// var requestType, responseType NamedDataType
-	rpc := RPCElement{Name: name, Documentation: documentation}
+	rpc := RPCElement{Location: p.declLoc, Name: name, Documentation: documentation}
 
 	// parse request type...
 	if rpc.RequestType, err = p.readRequestResponseType(); err != nil {
@@ -765,7 +773,7 @@ func (p *parser) readService(pf *ProtoFile, documentation string) error {
 		return p.throw('{', c)
 	}
 
-	se := ServiceElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
+	se := ServiceElement{Location: p.declLoc, Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
 
 	ctx := parseCtx{ctxType: serviceCtx, obj: &se}
 	if err = p.readDeclarationsInLoop(pf, ctx); err != nil {
@@ -787,7 +795,7 @@ func (p *parser) readEnum(pf *ProtoFile, documentation string, ctx parseCtx) err
 		return p.throw('{', c)
 	}
 
-	ee := EnumElement{Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
+	ee := EnumElement{Location: p.declLoc, Name: name, QualifiedName: p.prefix + name, Documentation: documentation}
 	innerCtx := parseCtx{ctxType: enumCtx, obj: &ee}
 	if err = p.readDeclarationsInLoop(pf, innerCtx); err != nil {
 		return err
@@ -1057,12 +1065,20 @@ func (p *parser) readSingleLineComment() string {
 	return str
 }
 
-func (p *parser) readUntil(delimiter byte) string {
-	s, err := p.br.ReadString(delimiter)
-	if err == io.EOF {
-		p.eofReached = true
+func (p *parser) readUntil(delimiter rune) string {
+	var buf bytes.Buffer
+	for {
+		c := p.read()
+		if c == eof {
+			p.eofReached = true
+			break
+		}
+		if c == delimiter {
+			break
+		}
+		_, _ = buf.WriteRune(c)
 	}
-	return strings.TrimSuffix(s, string(delimiter))
+	return buf.String()
 }
 
 func (p *parser) readUntilNewline() string {
