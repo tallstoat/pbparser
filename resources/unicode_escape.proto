@@ -6,6 +6,7 @@ option (unicode_opt) = "smile\u263Aface";
 option (big_unicode_opt) = "big\U0001F600end";
 option (octal_opt) = "bell\007end";
 option (mixed_opt) = "a\nb\tc\x41d";
+option (cap_hex_opt) = "cap\X48ex";
 
 message Foo {
   string name = 1 [(label) = "\x48\x65\x6C\x6Co"];

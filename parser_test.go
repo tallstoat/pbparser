@@ -1099,6 +1099,10 @@ func TestFloatOptionValues(t *testing.T) {
 		{"inf_val", "inf"},
 		{"nan_val", "nan"},
 		{"neg_inf", "-inf"},
+		{"sci_pos", "1.5E+3"},
+		{"sci_neg", "2.0e-10"},
+		{"dot_prefix", ".25"},
+		{"neg_dot", "-.75"},
 	}
 	if len(pf.Options) != len(expectedOpts) {
 		t.Fatalf("Expected %d file options, got %d", len(expectedOpts), len(pf.Options))
@@ -1251,6 +1255,7 @@ func TestUnicodeHexEscapes(t *testing.T) {
 		{"big_unicode_opt", `big\U0001F600end`},
 		{"octal_opt", `bell\007end`},
 		{"mixed_opt", `a\nb\tc\x41d`},
+		{"cap_hex_opt", `cap\X48ex`},
 	}
 	if len(pf.Options) != len(expectedOpts) {
 		t.Fatalf("Expected %d file options, got %d", len(expectedOpts), len(pf.Options))

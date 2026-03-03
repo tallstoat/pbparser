@@ -733,12 +733,29 @@ func (p *parser) readOptionValue(oe *OptionElement) error {
 		oe.IsAggregateValue = true
 	} else if c == '+' || c == '-' {
 		word := p.readWord()
+		word = p.readExponentSign(word)
 		oe.Value = string(c) + word
 	} else {
 		p.unread()
-		oe.Value = p.readWord()
+		word := p.readWord()
+		oe.Value = p.readExponentSign(word)
 	}
 	return nil
+}
+
+// readExponentSign checks if a word ends with 'e' or 'E' (scientific notation)
+// and the next character is '+' or '-', consuming the sign and remaining digits.
+// e.g., readWord returns "1.5E", this consumes "+3" to produce "1.5E+3".
+func (p *parser) readExponentSign(word string) string {
+	if len(word) > 0 && (word[len(word)-1] == 'e' || word[len(word)-1] == 'E') {
+		c := p.read()
+		if c == '+' || c == '-' {
+			rest := p.readWord()
+			return word + string(c) + rest
+		}
+		p.unread()
+	}
+	return word
 }
 
 // readAggregateValue reads a brace-delimited aggregate option value.
@@ -1442,7 +1459,7 @@ func (p *parser) readUntil(delimiter rune) string {
 			_, _ = buf.WriteRune(c2)
 			// consume additional characters for multi-char escapes
 			switch c2 {
-			case 'x': // \xHH - exactly 2 hex digits
+			case 'x', 'X': // \xHH or \XHH - up to 2 hex digits
 				p.readEscapeHexDigits(&buf, 2)
 			case 'u': // \uHHHH - exactly 4 hex digits
 				p.readEscapeHexDigits(&buf, 4)

@@ -7,6 +7,10 @@ option (plain) = 1.0;
 option (inf_val) = inf;
 option (nan_val) = nan;
 option (neg_inf) = -inf;
+option (sci_pos) = 1.5E+3;
+option (sci_neg) = 2.0e-10;
+option (dot_prefix) = .25;
+option (neg_dot) = -.75;
 
 message Foo {
   int32 id = 1 [(scale) = +100];
