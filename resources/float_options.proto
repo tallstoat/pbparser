@@ -1,0 +1,13 @@
+syntax = "proto3";
+package floatoptpkg;
+
+option (positive) = +2.5;
+option (negative) = -3.14;
+option (plain) = 1.0;
+option (inf_val) = inf;
+option (nan_val) = nan;
+option (neg_inf) = -inf;
+
+message Foo {
+  int32 id = 1 [(scale) = +100];
+}

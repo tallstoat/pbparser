@@ -1079,3 +1079,43 @@ func TestHexOctalFieldTags(t *testing.T) {
 		}
 	}
 }
+
+func TestFloatOptionValues(t *testing.T) {
+	pf, err := pbparser.ParseFile("./resources/float_options.proto")
+	if err != nil {
+		t.Fatalf("Failed to parse float_options.proto: %v", err)
+	}
+
+	// File-level options
+	expectedOpts := []struct {
+		name  string
+		value string
+	}{
+		{"positive", "+2.5"},
+		{"negative", "-3.14"},
+		{"plain", "1.0"},
+		{"inf_val", "inf"},
+		{"nan_val", "nan"},
+		{"neg_inf", "-inf"},
+	}
+	if len(pf.Options) != len(expectedOpts) {
+		t.Fatalf("Expected %d file options, got %d", len(expectedOpts), len(pf.Options))
+	}
+	for i, o := range pf.Options {
+		if o.Name != expectedOpts[i].name {
+			t.Errorf("Option %d: expected name %q, got %q", i, expectedOpts[i].name, o.Name)
+		}
+		if o.Value != expectedOpts[i].value {
+			t.Errorf("Option %q: expected value %q, got %q", expectedOpts[i].name, expectedOpts[i].value, o.Value)
+		}
+	}
+
+	// Inline field option with + sign
+	msg := pf.Messages[0]
+	if len(msg.Fields[0].Options) != 1 {
+		t.Fatalf("Expected 1 field option, got %d", len(msg.Fields[0].Options))
+	}
+	if msg.Fields[0].Options[0].Value != "+100" {
+		t.Errorf("Expected field option value '+100', got %q", msg.Fields[0].Options[0].Value)
+	}
+}

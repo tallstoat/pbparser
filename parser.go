@@ -631,26 +631,15 @@ func (p *parser) readListOptions() ([]OptionElement, error) {
 
 		// read option value
 		oe := OptionElement{Name: name, IsParenthesized: (enc == parenthesis)}
-		c := p.read()
-		if c == '"' {
-			oe.Value = p.readUntil('"')
-		} else if c == '{' {
-			val, err := p.readAggregateValue()
-			if err != nil {
-				return nil, err
-			}
-			oe.Value = val
-			oe.IsAggregateValue = true
-		} else {
-			p.unread()
-			oe.Value = p.readWord()
+		if err = p.readOptionValue(&oe); err != nil {
+			return nil, err
 		}
 
 		options = append(options, oe)
 
 		// check for delimiter: ']' ends the list, ',' continues
 		p.skipWhitespace()
-		c = p.read()
+		c := p.read()
 		if c == ']' {
 			break
 		} else if c != ',' {
@@ -677,19 +666,8 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 	}
 	p.skipWhitespace()
 
-	c := p.read()
-	if c == '"' {
-		oe.Value = p.readUntil('"')
-	} else if c == '{' {
-		val, err := p.readAggregateValue()
-		if err != nil {
-			return err
-		}
-		oe.Value = val
-		oe.IsAggregateValue = true
-	} else {
-		p.unread()
-		oe.Value = p.readWord()
+	if err = p.readOptionValue(&oe); err != nil {
+		return err
 	}
 
 	p.skipWhitespace()
@@ -715,6 +693,30 @@ func (p *parser) readOption(pf *ProtoFile, documentation string, ctx parseCtx) e
 		re.Options = append(re.Options, oe)
 	} else if ctx.ctxType == fileCtx {
 		pf.Options = append(pf.Options, oe)
+	}
+	return nil
+}
+
+// readOptionValue reads an option value which can be a quoted string,
+// an aggregate value in braces, or an unquoted literal (identifier, number,
+// or signed number with leading +/-).
+func (p *parser) readOptionValue(oe *OptionElement) error {
+	c := p.read()
+	if c == '"' {
+		oe.Value = p.readUntil('"')
+	} else if c == '{' {
+		val, err := p.readAggregateValue()
+		if err != nil {
+			return err
+		}
+		oe.Value = val
+		oe.IsAggregateValue = true
+	} else if c == '+' || c == '-' {
+		word := p.readWord()
+		oe.Value = string(c) + word
+	} else {
+		p.unread()
+		oe.Value = p.readWord()
 	}
 	return nil
 }
